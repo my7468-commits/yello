@@ -22,7 +22,7 @@
 <main>
   <h1>訂位管理（店家後台）</h1>
   <div class="notice" id="syncNotice">
-    此頁面僅供店家內部使用，需輸入管理密碼才能查看與更新訂位狀態。密碼與菜單管理共用。
+    此頁面僅供店家內部使用，需輸入管理密碼才能檢視與更新訂位狀態。密碼與菜單管理共用。
   </div>
 
   <div class="panel" id="loginPanel">
@@ -30,7 +30,7 @@
       <label for="passwordInput">管理密碼</label>
       <input type="password" id="passwordInput" placeholder="請輸入密碼" />
     </div>
-    <button type="button" id="loginBtn">登入查看訂位</button>
+    <button type="button" id="loginBtn">登入檢視訂位</button>
   </div>
 
   <div class="panel" id="listPanel" style="display:none;">
@@ -139,7 +139,7 @@ async function loadReservations() {
       listPanel.style.display = "none";
       loginPanel.style.display = "block";
     } else {
-      listEl.innerHTML = '<p class="empty-hint">讀取失敗，請按 F12 開啟開發者工具的 Console 分頁查看詳細錯誤，或稍後再按「重新整理」</p>';
+      listEl.innerHTML = '<p class="empty-hint">讀取失敗，請按 F12 開啟開發者工具的 Console 分頁檢視詳細錯誤，或稍後再按「重新整理」</p>';
     }
     return false;
   }
@@ -192,7 +192,7 @@ function renderReservations(reservations) {
       if (result.ok) {
         showToast("已更新為「" + status + "」");
       } else {
-        showToast("更新失敗：" + (result.reason === "密碼錯誤" ? "密碼錯誤" : "請檢查網路"));
+        showToast("更新失敗：" + (result.reason === "密碼錯誤" ? "密碼錯誤" : "請確認網路連線"));
       }
     });
   });
@@ -209,7 +209,7 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.textContent = "登入中...";
   const success = await loadReservations();
   loginBtn.disabled = false;
-  loginBtn.textContent = "登入查看訂位";
+  loginBtn.textContent = "登入檢視訂位";
   if (success) {
     loginPanel.style.display = "none";
     listPanel.style.display = "block";
@@ -300,7 +300,7 @@ async function persistAdminMenuChange(list) {
   } else if (result.reason === "密碼錯誤") {
     showToast("同步失敗：管理密碼錯誤");
   } else {
-    showToast("本機已更新，但同步共用菜單失敗，請檢查網路");
+    showToast("本機已更新，但同步共用菜單失敗，請確認網路連線");
   }
 }
 
