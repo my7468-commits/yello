@@ -174,13 +174,11 @@ form.addEventListener("submit", async (e) => {
     list = [...list, { id: uid("m"), ...data }];
   }
   resetForm();
-  addPanel.style.display = "none";
   await persistMenuChange(list);
 });
 
 document.getElementById("cancelEdit").addEventListener("click", () => {
   resetForm();
-  addPanel.style.display = "none";
 });
 
 toggleAdminBtn.addEventListener("click", () => {
