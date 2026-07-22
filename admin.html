@@ -37,6 +37,46 @@
     </div>
     <div id="reservationList"></div>
   </div>
+
+  <div class="panel" id="menuPanel" style="display:none;">
+    <div class="toolbar">
+      <h2 style="margin:0;">菜單管理</h2>
+      <button type="button" class="secondary" id="menuRefreshBtn">重新整理菜單</button>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="active" data-menutab="food">🍽 食物</button>
+      <button type="button" data-menutab="alcohol">🍷 酒類</button>
+    </div>
+
+    <div id="adminMenuList"></div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;" />
+
+    <h3 id="menuFormTitle">新增品項</h3>
+    <form id="menuItemForm">
+      <input type="hidden" id="menuEditId" />
+      <div class="row-2">
+        <div class="field">
+          <label for="menuItemName">品名 *</label>
+          <input type="text" id="menuItemName" required />
+        </div>
+        <div class="field">
+          <label for="menuItemPrice">價格（元，客人不會看到，供未來收費使用）</label>
+          <input type="number" id="menuItemPrice" min="0" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="menuItemDesc">說明</label>
+        <input type="text" id="menuItemDesc" placeholder="食材、口味描述等" />
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="menuItemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
+      </div>
+      <button type="submit" id="menuSubmitBtn">新增品項</button>
+      <button type="button" class="secondary" id="menuCancelEdit">取消</button>
+    </form>
+  </div>
 </main>
 
 <footer class="site-footer">© <span id="year"></span> 我的餐廳｜此為系統雛形版本</footer>
@@ -54,7 +94,16 @@ const loginBtn = document.getElementById("loginBtn");
 const refreshBtn = document.getElementById("refreshBtn");
 const listEl = document.getElementById("reservationList");
 
+const menuPanel = document.getElementById("menuPanel");
+const menuRefreshBtn = document.getElementById("menuRefreshBtn");
+const adminMenuListEl = document.getElementById("adminMenuList");
+const menuTabs = document.querySelectorAll("[data-menutab]");
+const menuItemForm = document.getElementById("menuItemForm");
+
 let adminPassword = "";
+let menuTab = "food";
+let currentFoodMenu = [];
+let currentAlcoholMenu = [];
 
 if (!isWebhookConfigured()) {
   syncNotice.textContent = "尚未設定共用試算表連結，無法讀取訂位。請先完成 config.js 的 WEBHOOK_URL 設定。";
@@ -153,6 +202,8 @@ loginBtn.addEventListener("click", async () => {
   if (success) {
     loginPanel.style.display = "none";
     listPanel.style.display = "block";
+    menuPanel.style.display = "block";
+    loadMenu();
   }
 });
 
@@ -161,6 +212,126 @@ passwordInput.addEventListener("keydown", (e) => {
 });
 
 refreshBtn.addEventListener("click", loadReservations);
+
+/* ===================================================================
+   菜單管理：沿用登入時輸入的管理密碼，新增/編輯/刪除後同步回共用試算表。
+   =================================================================== */
+
+function getCurrentAdminMenu() {
+  return menuTab === "food" ? currentFoodMenu : currentAlcoholMenu;
+}
+function setCurrentAdminMenu(list) {
+  if (menuTab === "food") currentFoodMenu = list;
+  else currentAlcoholMenu = list;
+}
+
+async function loadMenu() {
+  adminMenuListEl.innerHTML = '<p class="empty-hint">載入中...</p>';
+  const remote = await fetchRemoteMenu();
+  if (remote) {
+    currentFoodMenu = remote.food;
+    currentAlcoholMenu = remote.alcohol;
+  } else {
+    currentFoodMenu = Store.getFoodMenu();
+    currentAlcoholMenu = Store.getAlcoholMenu();
+  }
+  renderAdminMenu();
+}
+
+function renderAdminMenu() {
+  const items = getCurrentAdminMenu();
+  if (items.length === 0) {
+    adminMenuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
+    return;
+  }
+  adminMenuListEl.innerHTML = items.map((item) => `
+    <div class="menu-item">
+      <div class="info">
+        <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
+        <p>${escapeHtml(item.desc || "")}</p>
+        <div class="actions">
+          <button type="button" class="secondary" onclick="editMenuItem('${item.id}')">編輯</button>
+          <button type="button" class="danger" onclick="deleteMenuItem('${item.id}')">刪除</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function persistAdminMenuChange(list) {
+  setCurrentAdminMenu(list);
+  renderAdminMenu();
+  const result = await saveRemoteMenu(menuTab, list, adminPassword);
+  if (result.ok) {
+    showToast("已同步到共用菜單");
+  } else if (result.reason === "密碼錯誤") {
+    showToast("同步失敗：管理密碼錯誤");
+  } else {
+    showToast("本機已更新，但同步共用菜單失敗，請檢查網路");
+  }
+}
+
+function editMenuItem(id) {
+  const item = getCurrentAdminMenu().find((i) => i.id === id);
+  if (!item) return;
+  document.getElementById("menuEditId").value = item.id;
+  document.getElementById("menuItemName").value = item.name;
+  document.getElementById("menuItemPrice").value = item.price || "";
+  document.getElementById("menuItemDesc").value = item.desc || "";
+  document.getElementById("menuItemAvailable").checked = item.available !== false;
+  document.getElementById("menuFormTitle").textContent = "編輯品項";
+  document.getElementById("menuSubmitBtn").textContent = "儲存變更";
+  menuItemForm.scrollIntoView({ behavior: "smooth" });
+}
+window.editMenuItem = editMenuItem;
+
+async function deleteMenuItem(id) {
+  if (!confirm("確定要刪除此品項嗎？")) return;
+  const list = getCurrentAdminMenu().filter((i) => i.id !== id);
+  await persistAdminMenuChange(list);
+}
+window.deleteMenuItem = deleteMenuItem;
+
+function resetMenuForm() {
+  menuItemForm.reset();
+  document.getElementById("menuEditId").value = "";
+  document.getElementById("menuItemAvailable").checked = true;
+  document.getElementById("menuFormTitle").textContent = "新增品項";
+  document.getElementById("menuSubmitBtn").textContent = "新增品項";
+}
+
+menuItemForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("menuEditId").value;
+  const data = {
+    name: document.getElementById("menuItemName").value.trim(),
+    price: Number(document.getElementById("menuItemPrice").value) || 0,
+    desc: document.getElementById("menuItemDesc").value.trim(),
+    available: document.getElementById("menuItemAvailable").checked,
+  };
+  let list = getCurrentAdminMenu();
+  if (id) {
+    list = list.map((i) => (i.id === id ? { ...i, ...data } : i));
+  } else {
+    list = [...list, { id: uid("m"), ...data }];
+  }
+  resetMenuForm();
+  await persistAdminMenuChange(list);
+});
+
+document.getElementById("menuCancelEdit").addEventListener("click", resetMenuForm);
+
+menuTabs.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    menuTabs.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    menuTab = btn.dataset.menutab;
+    resetMenuForm();
+    renderAdminMenu();
+  });
+});
+
+menuRefreshBtn.addEventListener("click", loadMenu);
 </script>
 </body>
 </html>
