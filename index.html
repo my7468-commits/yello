@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>餐廳首頁</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">🍷 我的餐廳</a>
+  <nav class="site-nav">
+    <a href="index.html" class="active">首頁</a>
+    <a href="booking.html">訂位</a>
+    <a href="menu.html">菜單</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>歡迎光臨</h1>
+    <p>提供線上訂位與最新菜單資訊，酒類與食物品項不定期更新。</p>
+  </section>
+
+  <div class="card-grid">
+    <a class="entry-card" href="booking.html">
+      <span class="icon">📅</span>
+      <h2>線上訂位</h2>
+      <p>填寫姓名、人數與時間，快速預約座位。</p>
+    </a>
+    <a class="entry-card" href="menu.html">
+      <span class="icon">📖</span>
+      <h2>查看菜單</h2>
+      <p>瀏覽最新食物與酒類品項與價格。</p>
+    </a>
+  </div>
+</main>
+
+<footer class="site-footer">© <span id="year"></span> 我的餐廳｜此為系統雛形版本｜<a href="admin.html" style="color:inherit;">店家後台</a></footer>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>訂位 - 我的餐廳</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">🍷 我的餐廳</a>
+  <nav class="site-nav">
+    <a href="index.html">首頁</a>
+    <a href="booking.html" class="active">訂位</a>
+    <a href="menu.html">菜單</a>
+  </nav>
+</header>
+
+<main>
+  <h1>線上訂位</h1>
+  <div class="notice" id="syncNotice">
+    訂位送出後會同步寫入 Google 試算表；此頁面下方列表仍會保留一份在您瀏覽器裡的紀錄備查。
+  </div>
+
+  <div class="panel">
+    <form id="bookingForm">
+      <div class="row-2">
+        <div class="field">
+          <label for="name">姓名 *</label>
+          <input type="text" id="name" required placeholder="王小明" />
+        </div>
+        <div class="field">
+          <label for="phone">聯絡電話 *</label>
+          <input type="tel" id="phone" required placeholder="0912-345-678" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="date">日期 *</label>
+          <input type="date" id="date" required />
+        </div>
+        <div class="field">
+          <label for="time">時間 *</label>
+          <input type="time" id="time" required />
+        </div>
+      </div>
+      <div class="field">
+        <label for="people">人數 *</label>
+        <input type="number" id="people" min="1" max="30" required value="2" />
+      </div>
+      <div class="field">
+        <label>預訂餐點（選填）</label>
+        <div id="preOrderFood" class="preorder-group"></div>
+      </div>
+      <div class="field" id="preOrderTotalWrap" style="display:none;">
+        <strong>預估金額：NT$ <span id="preOrderTotal">0</span></strong>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin:4px 0 0;">僅供內部備料參考，非正式收費金額。</p>
+      </div>
+      <div class="field">
+        <label for="note">備註（過敏、慶生、加椅等）</label>
+        <textarea id="note" placeholder="選填"></textarea>
+      </div>
+      <button type="submit">送出訂位</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="toolbar">
+      <h2 style="margin:0;">我的訂位紀錄</h2>
+      <button type="button" class="secondary" id="clearAll">清空紀錄</button>
+    </div>
+    <div id="reservationList"></div>
+  </div>
+</main>
+
+<footer class="site-footer">© <span id="year"></span> 我的餐廳｜此為系統雛形版本｜<a href="admin.html" style="color:inherit;">店家後台</a></footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+document.getElementById("year").textContent = new Date().getFullYear();
+
+const form = document.getElementById("bookingForm");
+const listEl = document.getElementById("reservationList");
+const syncNotice = document.getElementById("syncNotice");
+
+if (!isWebhookConfigured()) {
+  syncNotice.textContent = "尚未設定 Google 試算表連結，目前訂位僅會存在您的瀏覽器中。請依 google-apps-script.gs 的步驟部署後，把網址貼到 config.js 的 WEBHOOK_URL。";
+}
+
+async function submitToGoogleSheet(data) {
+  if (!isWebhookConfigured()) return false;
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      mode: "no-cors", // Apps Script 網頁應用程式無法讀取回應內容，僅確保請求送出
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(data),
+    });
+    return true; // no-cors 下無法確認伺服器實際結果，視為已送出
+  } catch (err) {
+    console.error("寫入 Google 試算表失敗", err);
+    return false;
+  }
+}
+
+// ---- 預訂餐點 ----
+const preOrderFoodEl = document.getElementById("preOrderFood");
+const preOrderTotalWrap = document.getElementById("preOrderTotalWrap");
+const preOrderTotalEl = document.getElementById("preOrderTotal");
+
+function renderPreOrderGroup(container, items) {
+  const available = items.filter((i) => i.available !== false);
+  if (available.length === 0) {
+    container.innerHTML = '<p class="empty-hint" style="padding:8px 0;">目前無供應中品項</p>';
+    return;
+  }
+  container.innerHTML = available.map((item) => `
+    <div class="preorder-row" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-price="${item.price}">
+      <span class="name">${escapeHtml(item.name)} <span class="price">NT$ ${escapeHtml(item.price)}</span></span>
+      <input type="number" class="preorder-qty" min="0" max="99" value="0" />
+    </div>
+  `).join("");
+}
+
+function updatePreOrderTotal() {
+  let total = 0;
+  let anySelected = false;
+  document.querySelectorAll(".preorder-row").forEach((row) => {
+    const qty = Number(row.querySelector(".preorder-qty").value) || 0;
+    if (qty > 0) {
+      anySelected = true;
+      total += qty * Number(row.dataset.price);
+    }
+  });
+  preOrderTotalEl.textContent = total;
+  preOrderTotalWrap.style.display = anySelected ? "block" : "none";
+}
+
+function getPreOrderItems() {
+  const items = [];
+  document.querySelectorAll(".preorder-row").forEach((row) => {
+    const qty = Number(row.querySelector(".preorder-qty").value) || 0;
+    if (qty > 0) {
+      items.push({
+        id: row.dataset.id,
+        name: row.dataset.name,
+        price: Number(row.dataset.price),
+        qty,
+      });
+    }
+  });
+  return items;
+}
+
+function resetPreOrderInputs() {
+  document.querySelectorAll(".preorder-qty").forEach((input) => (input.value = 0));
+  updatePreOrderTotal();
+}
+
+renderPreOrderGroup(preOrderFoodEl, Store.getFoodMenu());
+document.addEventListener("input", (e) => {
+  if (e.target.classList.contains("preorder-qty")) updatePreOrderTotal();
+});
+
+function formatPreOrderItems(items) {
+  if (!items || items.length === 0) return "-";
+  return items.map((i) => `${i.name} x${i.qty}`).join("、");
+}
+
+function renderList() {
+  const items = Store.getReservations();
+  if (items.length === 0) {
+    listEl.innerHTML = '<p class="empty-hint">目前尚無訂位紀錄</p>';
+    return;
+  }
+  const rows = items.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td>
+      <td>${escapeHtml(r.people)} 位</td>
+      <td>${escapeHtml(formatPreOrderItems(r.preOrderItems))}</td>
+      <td>${r.estimatedTotal ? "NT$ " + escapeHtml(r.estimatedTotal) : "-"}</td>
+      <td>${escapeHtml(r.note) || "-"}</td>
+      <td><span class="tag">${r.status === "pending" ? "待確認" : r.status}</span></td>
+      <td><button type="button" class="secondary" data-id="${r.id}" onclick="removeItem('${r.id}')">刪除</button></td>
+    </tr>
+  `).join("");
+
+  listEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>預估金額</th><th>備註</th><th>狀態</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function removeItem(id) {
+  Store.removeReservation(id);
+  renderList();
+  showToast("已刪除該筆訂位");
+}
+window.removeItem = removeItem;
+
+document.getElementById("clearAll").addEventListener("click", () => {
+  if (confirm("確定要清空所有訂位紀錄嗎？此動作無法復原。")) {
+    writeList(STORAGE_KEYS.reservations, []);
+    renderList();
+    showToast("已清空所有紀錄");
+  }
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const preOrderItems = getPreOrderItems();
+  const estimatedTotal = preOrderItems.reduce((sum, i) => sum + i.qty * i.price, 0);
+  const data = {
+    id: uid("r"),
+    name: document.getElementById("name").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    date: document.getElementById("date").value,
+    time: document.getElementById("time").value,
+    people: document.getElementById("people").value,
+    note: document.getElementById("note").value.trim(),
+    preOrderItems,
+    estimatedTotal,
+  };
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "送出中...";
+
+  const sentToSheet = await submitToGoogleSheet(data);
+  Store.addReservation(data);
+
+  form.reset();
+  document.getElementById("people").value = 2;
+  resetPreOrderInputs();
+  renderList();
+  submitBtn.disabled = false;
+  submitBtn.textContent = "送出訂位";
+
+  if (isWebhookConfigured()) {
+    showToast(sentToSheet ? "訂位已送出，並同步到 Google 試算表！" : "訂位已存本機，但同步試算表失敗，請確認網路或設定");
+  } else {
+    showToast("訂位已送出（尚未同步試算表，請先完成設定）");
+  }
+});
+
+renderList();
+(async () => {
+  const remote = await fetchRemoteMenu();
+  if (remote) {
+    renderPreOrderGroup(preOrderFoodEl, remote.food);
+  }
+})();
+</script>
+</body>
+</html>

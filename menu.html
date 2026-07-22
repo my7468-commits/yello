@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>菜單 - 我的餐廳</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">🍷 我的餐廳</a>
+  <nav class="site-nav">
+    <a href="index.html">首頁</a>
+    <a href="booking.html">訂位</a>
+    <a href="menu.html" class="active">菜單</a>
+  </nav>
+</header>
+
+<main>
+  <h1>菜單</h1>
+  <div class="notice" id="syncNotice">
+    菜單資料已與共用的 Google 試算表同步，任何裝置打開都會看到最新內容。開啟「管理模式」（需輸入管理密碼）即可新增／編輯／刪除品項。
+  </div>
+
+  <div class="tabs">
+    <button type="button" class="active" data-tab="food">🍽 食物</button>
+    <button type="button" data-tab="alcohol">🍷 酒類</button>
+  </div>
+
+  <div class="toolbar">
+    <span></span>
+    <button type="button" class="secondary" id="toggleAdmin">開啟管理模式</button>
+  </div>
+
+  <div class="panel">
+    <div id="menuList"></div>
+  </div>
+
+  <div class="panel" id="addPanel" style="display:none;">
+    <h2 id="addPanelTitle">新增品項</h2>
+    <form id="itemForm">
+      <input type="hidden" id="editId" />
+      <div class="row-2">
+        <div class="field">
+          <label for="itemName">品名 *</label>
+          <input type="text" id="itemName" required />
+        </div>
+        <div class="field">
+          <label for="itemPrice">價格（元） *</label>
+          <input type="number" id="itemPrice" min="0" required />
+        </div>
+      </div>
+      <div class="field">
+        <label for="itemDesc">說明</label>
+        <input type="text" id="itemDesc" placeholder="食材、口味描述等" />
+      </div>
+      <div class="field">
+        <label><input type="checkbox" id="itemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
+      </div>
+      <button type="submit" id="submitBtn">新增品項</button>
+      <button type="button" class="secondary" id="cancelEdit">取消</button>
+    </form>
+  </div>
+</main>
+
+<footer class="site-footer">© <span id="year"></span> 我的餐廳｜此為系統雛形版本｜<a href="admin.html" style="color:inherit;">店家後台</a></footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+document.getElementById("year").textContent = new Date().getFullYear();
+
+let currentTab = "food";
+let adminMode = false;
+let adminPassword = "";
+
+const menuListEl = document.getElementById("menuList");
+const addPanel = document.getElementById("addPanel");
+const toggleAdminBtn = document.getElementById("toggleAdmin");
+const tabs = document.querySelectorAll(".tabs button");
+const form = document.getElementById("itemForm");
+const syncNotice = document.getElementById("syncNotice");
+
+if (!isWebhookConfigured()) {
+  syncNotice.textContent = "尚未設定共用試算表連結，目前菜單僅存在您的瀏覽器中。請依 google-apps-script.gs 的步驟部署後，把網址貼到 config.js 的 WEBHOOK_URL。";
+}
+
+function getCurrentMenu() {
+  return currentTab === "food" ? Store.getFoodMenu() : Store.getAlcoholMenu();
+}
+function saveCurrentMenu(list) {
+  if (currentTab === "food") Store.saveFoodMenu(list);
+  else Store.saveAlcoholMenu(list);
+}
+
+async function persistMenuChange(list) {
+  saveCurrentMenu(list);
+  renderMenu();
+  if (!isWebhookConfigured()) return;
+  const result = await saveRemoteMenu(currentTab, list, adminPassword);
+  if (result.ok) {
+    showToast("已同步到共用菜單");
+  } else if (result.reason === "密碼錯誤") {
+    showToast("同步失敗：管理密碼錯誤");
+  } else {
+    showToast("本機已更新，但同步共用菜單失敗，請檢查網路");
+  }
+}
+
+function renderMenu() {
+  const items = getCurrentMenu();
+  if (items.length === 0) {
+    menuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
+    return;
+  }
+  menuListEl.innerHTML = items.map((item) => `
+    <div class="menu-item">
+      <div class="info">
+        <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
+        <p>${escapeHtml(item.desc || "")}</p>
+        ${adminMode ? `
+          <div class="actions">
+            <button type="button" class="secondary" onclick="editItem('${item.id}')">編輯</button>
+            <button type="button" class="danger" onclick="deleteItem('${item.id}')">刪除</button>
+          </div>` : ""}
+      </div>
+      <div class="price">NT$ ${escapeHtml(item.price)}</div>
+    </div>
+  `).join("");
+}
+
+function editItem(id) {
+  const item = getCurrentMenu().find((i) => i.id === id);
+  if (!item) return;
+  document.getElementById("editId").value = item.id;
+  document.getElementById("itemName").value = item.name;
+  document.getElementById("itemPrice").value = item.price;
+  document.getElementById("itemDesc").value = item.desc || "";
+  document.getElementById("itemAvailable").checked = item.available !== false;
+  document.getElementById("addPanelTitle").textContent = "編輯品項";
+  document.getElementById("submitBtn").textContent = "儲存變更";
+  addPanel.style.display = "block";
+  addPanel.scrollIntoView({ behavior: "smooth" });
+}
+window.editItem = editItem;
+
+async function deleteItem(id) {
+  if (!confirm("確定要刪除此品項嗎？")) return;
+  const list = getCurrentMenu().filter((i) => i.id !== id);
+  await persistMenuChange(list);
+}
+window.deleteItem = deleteItem;
+
+function resetForm() {
+  form.reset();
+  document.getElementById("editId").value = "";
+  document.getElementById("itemAvailable").checked = true;
+  document.getElementById("addPanelTitle").textContent = "新增品項";
+  document.getElementById("submitBtn").textContent = "新增品項";
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("editId").value;
+  const data = {
+    name: document.getElementById("itemName").value.trim(),
+    price: Number(document.getElementById("itemPrice").value),
+    desc: document.getElementById("itemDesc").value.trim(),
+    available: document.getElementById("itemAvailable").checked,
+  };
+  let list = getCurrentMenu();
+  if (id) {
+    list = list.map((i) => (i.id === id ? { ...i, ...data } : i));
+  } else {
+    list = [...list, { id: uid("m"), ...data }];
+  }
+  resetForm();
+  addPanel.style.display = "none";
+  await persistMenuChange(list);
+});
+
+document.getElementById("cancelEdit").addEventListener("click", () => {
+  resetForm();
+  addPanel.style.display = "none";
+});
+
+toggleAdminBtn.addEventListener("click", () => {
+  if (!adminMode) {
+    if (isWebhookConfigured()) {
+      const pw = prompt("請輸入菜單管理密碼：");
+      if (pw === null) return; // 取消
+      adminPassword = pw;
+    }
+    adminMode = true;
+  } else {
+    adminMode = false;
+    adminPassword = "";
+  }
+  toggleAdminBtn.textContent = adminMode ? "關閉管理模式" : "開啟管理模式";
+  addPanel.style.display = adminMode ? "block" : "none";
+  if (!adminMode) resetForm();
+  renderMenu();
+});
+
+tabs.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    tabs.forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentTab = btn.dataset.tab;
+    resetForm();
+    renderMenu();
+  });
+});
+
+renderMenu();
+(async () => {
+  const remote = await fetchRemoteMenu();
+  if (remote) renderMenu();
+})();
+</script>
+</body>
+</html>

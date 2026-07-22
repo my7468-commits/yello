@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>訂位管理 - 我的餐廳</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="site-header">
+  <a class="brand" href="index.html">🍷 我的餐廳</a>
+  <nav class="site-nav">
+    <a href="index.html">首頁</a>
+    <a href="booking.html">訂位</a>
+    <a href="menu.html">菜單</a>
+  </nav>
+</header>
+
+<main>
+  <h1>訂位管理（店家後台）</h1>
+  <div class="notice" id="syncNotice">
+    此頁面僅供店家內部使用，需輸入管理密碼才能查看與更新訂位狀態。密碼與菜單管理共用。
+  </div>
+
+  <div class="panel" id="loginPanel">
+    <div class="field">
+      <label for="passwordInput">管理密碼</label>
+      <input type="password" id="passwordInput" placeholder="請輸入密碼" />
+    </div>
+    <button type="button" id="loginBtn">登入查看訂位</button>
+  </div>
+
+  <div class="panel" id="listPanel" style="display:none;">
+    <div class="toolbar">
+      <h2 style="margin:0;">所有訂位</h2>
+      <button type="button" class="secondary" id="refreshBtn">重新整理</button>
+    </div>
+    <div id="reservationList"></div>
+  </div>
+</main>
+
+<footer class="site-footer">© <span id="year"></span> 我的餐廳｜此為系統雛形版本</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+document.getElementById("year").textContent = new Date().getFullYear();
+
+const syncNotice = document.getElementById("syncNotice");
+const loginPanel = document.getElementById("loginPanel");
+const listPanel = document.getElementById("listPanel");
+const passwordInput = document.getElementById("passwordInput");
+const loginBtn = document.getElementById("loginBtn");
+const refreshBtn = document.getElementById("refreshBtn");
+const listEl = document.getElementById("reservationList");
+
+let adminPassword = "";
+
+if (!isWebhookConfigured()) {
+  syncNotice.textContent = "尚未設定共用試算表連結，無法讀取訂位。請先完成 config.js 的 WEBHOOK_URL 設定。";
+  loginBtn.disabled = true;
+}
+
+const STATUS_OPTIONS = ["待確認", "已確認", "已取消"];
+
+function formatDateTime(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("zh-TW", { hour12: false });
+}
+
+async function loadReservations() {
+  listEl.innerHTML = '<p class="empty-hint">載入中...</p>';
+  const result = await fetchRemoteReservations(adminPassword);
+  if (!result.ok) {
+    if (result.reason === "密碼錯誤") {
+      showToast("密碼錯誤，請重新輸入");
+      listPanel.style.display = "none";
+      loginPanel.style.display = "block";
+    } else {
+      listEl.innerHTML = '<p class="empty-hint">讀取失敗，請按 F12 開啟開發者工具的 Console 分頁查看詳細錯誤，或稍後再按「重新整理」</p>';
+    }
+    return false;
+  }
+  renderReservations(result.reservations);
+  return true;
+}
+
+function renderReservations(reservations) {
+  if (reservations.length === 0) {
+    listEl.innerHTML = '<p class="empty-hint">目前尚無訂位</p>';
+    return;
+  }
+
+  const rows = reservations.map((r) => `
+    <tr data-id="${escapeHtml(r.id)}">
+      <td>${escapeHtml(formatDateTime(r.submittedAt))}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td>
+      <td>${escapeHtml(r.people)} 位</td>
+      <td>${escapeHtml(r.items) || "-"}</td>
+      <td>${r.estimatedTotal ? "NT$ " + escapeHtml(r.estimatedTotal) : "-"}</td>
+      <td>${escapeHtml(r.note) || "-"}</td>
+      <td>
+        <select class="statusSelect">
+          ${STATUS_OPTIONS.map((s) => `<option value="${s}" ${s === r.status ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </td>
+    </tr>
+  `).join("");
+
+  listEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>送出時間</th><th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>預估金額</th><th>備註</th><th>狀態</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  listEl.querySelectorAll(".statusSelect").forEach((select) => {
+    select.addEventListener("change", async (e) => {
+      const row = e.target.closest("tr");
+      const id = row.dataset.id;
+      const status = e.target.value;
+      e.target.disabled = true;
+      const result = await updateRemoteReservationStatus(id, status, adminPassword);
+      e.target.disabled = false;
+      if (result.ok) {
+        showToast("已更新為「" + status + "」");
+      } else {
+        showToast("更新失敗：" + (result.reason === "密碼錯誤" ? "密碼錯誤" : "請檢查網路"));
+      }
+    });
+  });
+}
+
+loginBtn.addEventListener("click", async () => {
+  const pw = passwordInput.value.trim();
+  if (!pw) {
+    showToast("請輸入密碼");
+    return;
+  }
+  adminPassword = pw;
+  loginBtn.disabled = true;
+  loginBtn.textContent = "登入中...";
+  const success = await loadReservations();
+  loginBtn.disabled = false;
+  loginBtn.textContent = "登入查看訂位";
+  if (success) {
+    loginPanel.style.display = "none";
+    listPanel.style.display = "block";
+  }
+});
+
+passwordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loginBtn.click();
+});
+
+refreshBtn.addEventListener("click", loadReservations);
+</script>
+</body>
+</html>
