@@ -143,6 +143,11 @@ form input, form select, form textarea {
   color: var(--text);
 }
 
+/* 表單以外的下拉選單（例如訂位管理表格裡的狀態選單）也要套用同一套字體 */
+select {
+  font-family: inherit;
+}
+
 form textarea { resize: vertical; min-height: 70px; }
 
 .row-2 {
@@ -156,6 +161,7 @@ form textarea { resize: vertical; min-height: 70px; }
 }
 
 button, .btn {
+  font-family: inherit;
   background: var(--accent);
   color: #fff;
   border: none;
