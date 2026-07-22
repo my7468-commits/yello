@@ -17,10 +17,13 @@ const DEFAULT_FOOD = [
   { id: "f3", name: "自製提拉米蘇", price: 180, desc: "手工馬斯卡彭起司、可可粉", available: true },
 ];
 
+// 酒單分類（給下拉選單與分組顯示用）
+const ALCOHOL_CATEGORIES = ["威士忌", "調酒", "紅白酒", "啤酒", "其它"];
+
 const DEFAULT_ALCOHOL = [
-  { id: "a1", name: "招牌梅酒 Sour", price: 260, desc: "日本梅酒、氣泡水、檸檬", available: true },
-  { id: "a2", name: "Old Fashioned", price: 320, desc: "波本威士忌、苦精、橙皮", available: true },
-  { id: "a3", name: "生啤酒（一杯）", price: 160, desc: "當季精釀，口味依供應調整", available: true },
+  { id: "a1", name: "招牌梅酒 Sour", price: 260, desc: "日本梅酒、氣泡水、檸檬", available: true, category: "調酒" },
+  { id: "a2", name: "Old Fashioned", price: 320, desc: "波本威士忌、苦精、橙皮", available: true, category: "調酒" },
+  { id: "a3", name: "生啤酒（一杯）", price: 160, desc: "當季精釀，口味依供應調整", available: true, category: "啤酒" },
 ];
 
 function uid(prefix) {

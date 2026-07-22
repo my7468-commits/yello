@@ -46,7 +46,7 @@
 
     <div class="tabs">
       <button type="button" class="active" data-menutab="food">🍽 食物</button>
-      <button type="button" data-menutab="alcohol">🍷 酒類</button>
+      <button type="button" data-menutab="alcohol">🍷 酒單</button>
     </div>
 
     <div id="adminMenuList"></div>
@@ -69,6 +69,10 @@
       <div class="field">
         <label for="menuItemDesc">說明</label>
         <input type="text" id="menuItemDesc" placeholder="食材、口味描述等" />
+      </div>
+      <div class="field" id="menuCategoryFieldWrap" style="display:none;">
+        <label for="menuItemCategory">分類</label>
+        <select id="menuItemCategory"></select>
       </div>
       <div class="field">
         <label><input type="checkbox" id="menuItemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
@@ -99,6 +103,10 @@ const menuRefreshBtn = document.getElementById("menuRefreshBtn");
 const adminMenuListEl = document.getElementById("adminMenuList");
 const menuTabs = document.querySelectorAll("[data-menutab]");
 const menuItemForm = document.getElementById("menuItemForm");
+const menuCategoryFieldWrap = document.getElementById("menuCategoryFieldWrap");
+const menuCategorySelect = document.getElementById("menuItemCategory");
+
+menuCategorySelect.innerHTML = ALCOHOL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
 let adminPassword = "";
 let menuTab = "food";
@@ -238,13 +246,8 @@ async function loadMenu() {
   renderAdminMenu();
 }
 
-function renderAdminMenu() {
-  const items = getCurrentAdminMenu();
-  if (items.length === 0) {
-    adminMenuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
-    return;
-  }
-  adminMenuListEl.innerHTML = items.map((item) => `
+function renderAdminMenuItem(item) {
+  return `
     <div class="menu-item">
       <div class="info">
         <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
@@ -255,6 +258,33 @@ function renderAdminMenu() {
         </div>
       </div>
     </div>
+  `;
+}
+
+function renderAdminMenu() {
+  const items = getCurrentAdminMenu();
+  if (items.length === 0) {
+    adminMenuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
+    return;
+  }
+
+  if (menuTab !== "alcohol") {
+    adminMenuListEl.innerHTML = items.map(renderAdminMenuItem).join("");
+    return;
+  }
+
+  // 酒單依分類分組顯示（沒有分類或分類不在清單中的，一律歸到「其它」）
+  const groups = ALCOHOL_CATEGORIES.map((cat) => ({
+    name: cat,
+    items: items.filter((i) => {
+      const itemCat = ALCOHOL_CATEGORIES.includes(i.category) ? i.category : "其它";
+      return itemCat === cat;
+    }),
+  })).filter((g) => g.items.length > 0);
+
+  adminMenuListEl.innerHTML = groups.map((g) => `
+    <h3 style="margin:20px 0 4px;color:var(--accent-dark);">${escapeHtml(g.name)}</h3>
+    ${g.items.map(renderAdminMenuItem).join("")}
   `).join("");
 }
 
@@ -279,6 +309,9 @@ function editMenuItem(id) {
   document.getElementById("menuItemPrice").value = item.price || "";
   document.getElementById("menuItemDesc").value = item.desc || "";
   document.getElementById("menuItemAvailable").checked = item.available !== false;
+  if (menuTab === "alcohol") {
+    menuCategorySelect.value = ALCOHOL_CATEGORIES.includes(item.category) ? item.category : "其它";
+  }
   document.getElementById("menuFormTitle").textContent = "編輯品項";
   document.getElementById("menuSubmitBtn").textContent = "儲存變更";
   menuItemForm.scrollIntoView({ behavior: "smooth" });
@@ -296,6 +329,7 @@ function resetMenuForm() {
   menuItemForm.reset();
   document.getElementById("menuEditId").value = "";
   document.getElementById("menuItemAvailable").checked = true;
+  menuCategoryFieldWrap.style.display = menuTab === "alcohol" ? "block" : "none";
   document.getElementById("menuFormTitle").textContent = "新增品項";
   document.getElementById("menuSubmitBtn").textContent = "新增品項";
 }
@@ -309,6 +343,9 @@ menuItemForm.addEventListener("submit", async (e) => {
     desc: document.getElementById("menuItemDesc").value.trim(),
     available: document.getElementById("menuItemAvailable").checked,
   };
+  if (menuTab === "alcohol") {
+    data.category = menuCategorySelect.value;
+  }
   let list = getCurrentAdminMenu();
   if (id) {
     list = list.map((i) => (i.id === id ? { ...i, ...data } : i));

@@ -24,7 +24,7 @@
 
   <div class="tabs">
     <button type="button" class="active" data-tab="food">🍽 食物</button>
-    <button type="button" data-tab="alcohol">🍷 酒類</button>
+    <button type="button" data-tab="alcohol">🍷 酒單</button>
   </div>
 
   <div class="toolbar">
@@ -54,6 +54,10 @@
         <label for="itemDesc">說明</label>
         <input type="text" id="itemDesc" placeholder="食材、口味描述等" />
       </div>
+      <div class="field" id="categoryFieldWrap" style="display:none;">
+        <label for="itemCategory">分類</label>
+        <select id="itemCategory"></select>
+      </div>
       <div class="field">
         <label><input type="checkbox" id="itemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
       </div>
@@ -80,6 +84,10 @@ const toggleAdminBtn = document.getElementById("toggleAdmin");
 const tabs = document.querySelectorAll(".tabs button");
 const form = document.getElementById("itemForm");
 const syncNotice = document.getElementById("syncNotice");
+const categoryFieldWrap = document.getElementById("categoryFieldWrap");
+const categorySelect = document.getElementById("itemCategory");
+
+categorySelect.innerHTML = ALCOHOL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
 if (!isWebhookConfigured()) {
   syncNotice.textContent = "尚未設定共用試算表連結，目前菜單僅存在您的瀏覽器中。請依 google-apps-script.gs 的步驟部署後，把網址貼到 config.js 的 WEBHOOK_URL。";
@@ -107,13 +115,8 @@ async function persistMenuChange(list) {
   }
 }
 
-function renderMenu() {
-  const items = getCurrentMenu();
-  if (items.length === 0) {
-    menuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
-    return;
-  }
-  menuListEl.innerHTML = items.map((item) => `
+function renderMenuItem(item) {
+  return `
     <div class="menu-item">
       <div class="info">
         <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
@@ -125,6 +128,33 @@ function renderMenu() {
           </div>` : ""}
       </div>
     </div>
+  `;
+}
+
+function renderMenu() {
+  const items = getCurrentMenu();
+  if (items.length === 0) {
+    menuListEl.innerHTML = '<p class="empty-hint">目前沒有品項</p>';
+    return;
+  }
+
+  if (currentTab !== "alcohol") {
+    menuListEl.innerHTML = items.map(renderMenuItem).join("");
+    return;
+  }
+
+  // 酒單依分類分組顯示（沒有分類或分類不在清單中的，一律歸到「其它」）
+  const groups = ALCOHOL_CATEGORIES.map((cat) => ({
+    name: cat,
+    items: items.filter((i) => {
+      const itemCat = ALCOHOL_CATEGORIES.includes(i.category) ? i.category : "其它";
+      return itemCat === cat;
+    }),
+  })).filter((g) => g.items.length > 0);
+
+  menuListEl.innerHTML = groups.map((g) => `
+    <h3 style="margin:20px 0 4px;color:var(--accent-dark);">${escapeHtml(g.name)}</h3>
+    ${g.items.map(renderMenuItem).join("")}
   `).join("");
 }
 
@@ -136,6 +166,9 @@ function editItem(id) {
   document.getElementById("itemPrice").value = item.price;
   document.getElementById("itemDesc").value = item.desc || "";
   document.getElementById("itemAvailable").checked = item.available !== false;
+  if (currentTab === "alcohol") {
+    categorySelect.value = ALCOHOL_CATEGORIES.includes(item.category) ? item.category : "其它";
+  }
   document.getElementById("addPanelTitle").textContent = "編輯品項";
   document.getElementById("submitBtn").textContent = "儲存變更";
   addPanel.style.display = "block";
@@ -154,6 +187,7 @@ function resetForm() {
   form.reset();
   document.getElementById("editId").value = "";
   document.getElementById("itemAvailable").checked = true;
+  categoryFieldWrap.style.display = currentTab === "alcohol" ? "block" : "none";
   document.getElementById("addPanelTitle").textContent = "新增品項";
   document.getElementById("submitBtn").textContent = "新增品項";
 }
@@ -167,6 +201,9 @@ form.addEventListener("submit", async (e) => {
     desc: document.getElementById("itemDesc").value.trim(),
     available: document.getElementById("itemAvailable").checked,
   };
+  if (currentTab === "alcohol") {
+    data.category = categorySelect.value;
+  }
   let list = getCurrentMenu();
   if (id) {
     list = list.map((i) => (i.id === id ? { ...i, ...data } : i));
@@ -195,7 +232,7 @@ toggleAdminBtn.addEventListener("click", () => {
   }
   toggleAdminBtn.textContent = adminMode ? "關閉管理模式" : "開啟管理模式";
   addPanel.style.display = adminMode ? "block" : "none";
-  if (!adminMode) resetForm();
+  resetForm();
   renderMenu();
 });
 
