@@ -52,10 +52,6 @@
         <label>預訂餐點（選填）</label>
         <div id="preOrderFood" class="preorder-group"></div>
       </div>
-      <div class="field" id="preOrderTotalWrap" style="display:none;">
-        <strong>預估金額：NT$ <span id="preOrderTotal">0</span></strong>
-        <p style="color:var(--text-muted);font-size:0.85rem;margin:4px 0 0;">僅供內部備料參考，非正式收費金額。</p>
-      </div>
       <div class="field">
         <label for="note">備註（過敏、慶生、加椅等）</label>
         <textarea id="note" placeholder="選填"></textarea>
@@ -94,8 +90,6 @@ async function submitToGoogleSheet(data) {
 
 // ---- 預訂餐點 ----
 const preOrderFoodEl = document.getElementById("preOrderFood");
-const preOrderTotalWrap = document.getElementById("preOrderTotalWrap");
-const preOrderTotalEl = document.getElementById("preOrderTotal");
 
 function renderPreOrderGroup(container, items) {
   const available = items.filter((i) => i.available !== false);
@@ -104,25 +98,11 @@ function renderPreOrderGroup(container, items) {
     return;
   }
   container.innerHTML = available.map((item) => `
-    <div class="preorder-row" data-id="${item.id}" data-name="${escapeHtml(item.name)}" data-price="${item.price}">
-      <span class="name">${escapeHtml(item.name)} <span class="price">NT$ ${escapeHtml(item.price)}</span></span>
+    <div class="preorder-row" data-id="${item.id}" data-name="${escapeHtml(item.name)}">
+      <span class="name">${escapeHtml(item.name)}</span>
       <input type="number" class="preorder-qty" min="0" max="99" value="0" />
     </div>
   `).join("");
-}
-
-function updatePreOrderTotal() {
-  let total = 0;
-  let anySelected = false;
-  document.querySelectorAll(".preorder-row").forEach((row) => {
-    const qty = Number(row.querySelector(".preorder-qty").value) || 0;
-    if (qty > 0) {
-      anySelected = true;
-      total += qty * Number(row.dataset.price);
-    }
-  });
-  preOrderTotalEl.textContent = total;
-  preOrderTotalWrap.style.display = anySelected ? "block" : "none";
 }
 
 function getPreOrderItems() {
@@ -133,7 +113,6 @@ function getPreOrderItems() {
       items.push({
         id: row.dataset.id,
         name: row.dataset.name,
-        price: Number(row.dataset.price),
         qty,
       });
     }
@@ -143,13 +122,9 @@ function getPreOrderItems() {
 
 function resetPreOrderInputs() {
   document.querySelectorAll(".preorder-qty").forEach((input) => (input.value = 0));
-  updatePreOrderTotal();
 }
 
 renderPreOrderGroup(preOrderFoodEl, Store.getFoodMenu());
-document.addEventListener("input", (e) => {
-  if (e.target.classList.contains("preorder-qty")) updatePreOrderTotal();
-});
 
 function formatPreOrderItems(items) {
   if (!items || items.length === 0) return "-";
@@ -169,7 +144,6 @@ function renderList() {
       <td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td>
       <td>${escapeHtml(r.people)} 位</td>
       <td>${escapeHtml(formatPreOrderItems(r.preOrderItems))}</td>
-      <td>${r.estimatedTotal ? "NT$ " + escapeHtml(r.estimatedTotal) : "-"}</td>
       <td>${escapeHtml(r.note) || "-"}</td>
       <td><span class="tag">${r.status === "pending" ? "待確認" : r.status}</span></td>
       <td><button type="button" class="secondary" data-id="${r.id}" onclick="removeItem('${r.id}')">刪除</button></td>
@@ -180,7 +154,7 @@ function renderList() {
     <table>
       <thead>
         <tr>
-          <th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>預估金額</th><th>備註</th><th>狀態</th><th></th>
+          <th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -207,7 +181,6 @@ form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const submitBtn = form.querySelector('button[type="submit"]');
   const preOrderItems = getPreOrderItems();
-  const estimatedTotal = preOrderItems.reduce((sum, i) => sum + i.qty * i.price, 0);
   const data = {
     id: uid("r"),
     name: document.getElementById("name").value.trim(),
@@ -217,7 +190,6 @@ form.addEventListener("submit", async (e) => {
     people: document.getElementById("people").value,
     note: document.getElementById("note").value.trim(),
     preOrderItems,
-    estimatedTotal,
   };
 
   submitBtn.disabled = true;

@@ -101,7 +101,6 @@ function renderReservations(reservations) {
       <td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td>
       <td>${escapeHtml(r.people)} 位</td>
       <td>${escapeHtml(r.items) || "-"}</td>
-      <td>${r.estimatedTotal ? "NT$ " + escapeHtml(r.estimatedTotal) : "-"}</td>
       <td>${escapeHtml(r.note) || "-"}</td>
       <td>
         <select class="statusSelect">
@@ -115,7 +114,7 @@ function renderReservations(reservations) {
     <table>
       <thead>
         <tr>
-          <th>送出時間</th><th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>預估金額</th><th>備註</th><th>狀態</th>
+          <th>送出時間</th><th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
