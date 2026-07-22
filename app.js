@@ -100,12 +100,57 @@ function isWebhookConfigured() {
   return typeof WEBHOOK_URL !== "undefined" && WEBHOOK_URL && WEBHOOK_URL.indexOf("PASTE_YOUR") === -1;
 }
 
+/* ---------------------------------------------------------------------
+   Google Apps Script 網頁應用程式的回應「不會」帶 Access-Control-Allow-Origin
+   標頭，所以瀏覽器用一般 fetch() 讀取回應內容一律會被 CORS 政策擋下來
+   （不管是用 file:// 打開，還是部署到 GitHub Pages 等正式網址都一樣）。
+   這裡改用 JSONP（動態插入 <script> 標籤）繞開這個限制：
+   script 標籤載入外部資源不受 CORS 限制，Apps Script 那邊只要把 JSON
+   包成 callbackName(JSON) 的函式呼叫格式回傳即可。
+   --------------------------------------------------------------------- */
+function jsonp(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const callbackName = "__jsonp_cb_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const script = document.createElement("script");
+    let settled = false;
+
+    function cleanup() {
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      clearTimeout(timer);
+    }
+
+    window[callbackName] = function (data) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(data);
+    };
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("timeout"));
+    }, timeoutMs || 15000);
+
+    script.onerror = function () {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("script_load_error"));
+    };
+
+    const sep = url.indexOf("?") === -1 ? "?" : "&";
+    script.src = url + sep + "callback=" + callbackName;
+    document.head.appendChild(script);
+  });
+}
+
 async function fetchRemoteMenu() {
   if (!isWebhookConfigured()) return null;
   try {
-    const res = await fetch(`${WEBHOOK_URL}?action=getMenu`);
-    if (!res.ok) return null;
-    const data = await res.json();
+    const data = await jsonp(`${WEBHOOK_URL}?action=getMenu`);
     if (data && Array.isArray(data.food) && Array.isArray(data.alcohol)) {
       Store.saveFoodMenu(data.food);
       Store.saveAlcoholMenu(data.alcohol);
@@ -121,12 +166,8 @@ async function fetchRemoteMenu() {
 async function saveRemoteMenu(category, items, password) {
   if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
   try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "saveMenu", category, password, items }),
-    });
-    const data = await res.json();
+    const url = `${WEBHOOK_URL}?action=saveMenu&category=${encodeURIComponent(category)}&password=${encodeURIComponent(password)}&items=${encodeURIComponent(JSON.stringify(items))}`;
+    const data = await jsonp(url);
     if (data && data.result === "success") return { ok: true };
     return { ok: false, reason: data && data.message ? data.message : "unknown" };
   } catch (err) {
@@ -141,25 +182,15 @@ async function saveRemoteMenu(category, items, password) {
 
 async function fetchRemoteReservations(password) {
   if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
-  let rawText = "";
   try {
-    const res = await fetch(`${WEBHOOK_URL}?action=getReservations&password=${encodeURIComponent(password)}`);
-    rawText = await res.text();
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch (parseErr) {
-      // 回傳的不是 JSON，通常代表 Apps Script 那邊出錯（例如尚未重新部署、
-      // 執行權限設定錯誤等），把原始內容印在 Console 方便除錯。
-      console.error("讀取訂位清單失敗：回應不是有效的 JSON，原始內容如下：\n", rawText);
-      return { ok: false, reason: "invalid_response" };
-    }
+    const url = `${WEBHOOK_URL}?action=getReservations&password=${encodeURIComponent(password)}`;
+    const data = await jsonp(url);
     if (data && Array.isArray(data.reservations)) {
       return { ok: true, reservations: data.reservations };
     }
     return { ok: false, reason: data && data.message ? data.message : "unknown" };
   } catch (err) {
-    console.error("讀取訂位清單失敗（網路或連線問題）", err);
+    console.error("讀取訂位清單失敗", err);
     return { ok: false, reason: "network" };
   }
 }
@@ -167,17 +198,25 @@ async function fetchRemoteReservations(password) {
 async function updateRemoteReservationStatus(id, status, password) {
   if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
   try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "updateReservationStatus", id, status, password }),
-    });
-    const data = await res.json();
+    const url = `${WEBHOOK_URL}?action=updateReservationStatus&id=${encodeURIComponent(id)}&status=${encodeURIComponent(status)}&password=${encodeURIComponent(password)}`;
+    const data = await jsonp(url);
     if (data && data.result === "success") return { ok: true };
     return { ok: false, reason: data && data.message ? data.message : "unknown" };
   } catch (err) {
     console.error("更新訂位狀態失敗", err);
     return { ok: false, reason: "network" };
+  }
+}
+
+async function submitReservationRemote(data) {
+  if (!isWebhookConfigured()) return false;
+  try {
+    const url = `${WEBHOOK_URL}?action=submitReservation&data=${encodeURIComponent(JSON.stringify(data))}`;
+    const result = await jsonp(url);
+    return !!(result && result.result === "success");
+  } catch (err) {
+    console.error("寫入 Google 試算表失敗", err);
+    return false;
   }
 }
 

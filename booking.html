@@ -89,19 +89,7 @@ if (!isWebhookConfigured()) {
 }
 
 async function submitToGoogleSheet(data) {
-  if (!isWebhookConfigured()) return false;
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: "POST",
-      mode: "no-cors", // Apps Script 網頁應用程式無法讀取回應內容，僅確保請求送出
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(data),
-    });
-    return true; // no-cors 下無法確認伺服器實際結果，視為已送出
-  } catch (err) {
-    console.error("寫入 Google 試算表失敗", err);
-    return false;
-  }
+  return submitReservationRemote(data);
 }
 
 // ---- 預訂餐點 ----
