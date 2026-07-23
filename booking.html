@@ -87,6 +87,55 @@
     </div>
     <div id="calGrid"></div>
     <div id="calDayDetail"></div>
+
+    <form id="calEditForm" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h3 style="margin-top:0;">編輯訂位</h3>
+      <input type="hidden" id="calEditId" />
+      <div class="row-2">
+        <div class="field">
+          <label for="calEditName">姓名</label>
+          <input type="text" id="calEditName" />
+        </div>
+        <div class="field">
+          <label for="calEditPhone">電話</label>
+          <input type="tel" id="calEditPhone" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="calEditDate">日期</label>
+          <input type="date" id="calEditDate" />
+        </div>
+        <div class="field">
+          <label for="calEditTime">時間</label>
+          <input type="time" id="calEditTime" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label for="calEditPeople">人數</label>
+          <input type="number" id="calEditPeople" min="1" max="30" />
+        </div>
+        <div class="field">
+          <label for="calEditStatus">狀態</label>
+          <select id="calEditStatus">
+            <option value="待確認">待確認</option>
+            <option value="已確認">已確認</option>
+            <option value="已取消">已取消</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="calEditItems">預訂餐點</label>
+        <input type="text" id="calEditItems" placeholder="例如：松露野菇燉飯 x1、自製提拉米蘇 x2" />
+      </div>
+      <div class="field">
+        <label for="calEditNote">備註</label>
+        <textarea id="calEditNote"></textarea>
+      </div>
+      <button type="submit" id="calEditSaveBtn">儲存變更</button>
+      <button type="button" class="secondary" id="calEditCancelBtn">取消</button>
+    </form>
   </div>
 </main>
 
@@ -256,6 +305,8 @@ const calCloseBtn = document.getElementById("calCloseBtn");
 const calGrid = document.getElementById("calGrid");
 const calTitle = document.getElementById("calTitle");
 const calDayDetail = document.getElementById("calDayDetail");
+const calEditForm = document.getElementById("calEditForm");
+const calEditCancelBtn = document.getElementById("calEditCancelBtn");
 
 let calPassword = "";
 let calReservations = [];
@@ -387,18 +438,71 @@ function renderDayDetail() {
       <td>${escapeHtml(r.items) || "-"}</td>
       <td>${escapeHtml(r.note) || "-"}</td>
       <td><span class="tag">${escapeHtml(r.status)}</span></td>
+      <td><button type="button" class="secondary" onclick="openCalEdit('${r.id}')">編輯</button></td>
     </tr>
   `).join("");
   calDayDetail.innerHTML = `
     <h3 style="margin-top:20px;">${escapeHtml(calSelectedDate)} 訂位明細</h3>
     <table>
       <thead>
-        <tr><th>時間</th><th>姓名</th><th>電話</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th></tr>
+        <tr><th>時間</th><th>姓名</th><th>電話</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
   `;
 }
+
+function openCalEdit(id) {
+  const r = calReservations.find((x) => x.id === id);
+  if (!r) return;
+  document.getElementById("calEditId").value = r.id;
+  document.getElementById("calEditName").value = r.name || "";
+  document.getElementById("calEditPhone").value = r.phone || "";
+  document.getElementById("calEditDate").value = r.date || "";
+  document.getElementById("calEditTime").value = r.time || "";
+  document.getElementById("calEditPeople").value = r.people || "";
+  document.getElementById("calEditStatus").value = r.status || "待確認";
+  document.getElementById("calEditItems").value = r.items || "";
+  document.getElementById("calEditNote").value = r.note || "";
+  calEditForm.style.display = "block";
+  calEditForm.scrollIntoView({ behavior: "smooth" });
+}
+window.openCalEdit = openCalEdit;
+
+function closeCalEdit() {
+  calEditForm.style.display = "none";
+  calEditForm.reset();
+}
+calEditCancelBtn.addEventListener("click", closeCalEdit);
+
+calEditForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const id = document.getElementById("calEditId").value;
+  const fields = {
+    name: document.getElementById("calEditName").value.trim(),
+    phone: document.getElementById("calEditPhone").value.trim(),
+    date: document.getElementById("calEditDate").value,
+    time: document.getElementById("calEditTime").value,
+    people: document.getElementById("calEditPeople").value,
+    status: document.getElementById("calEditStatus").value,
+    items: document.getElementById("calEditItems").value.trim(),
+    note: document.getElementById("calEditNote").value.trim(),
+  };
+  const saveBtn = document.getElementById("calEditSaveBtn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "儲存中...";
+  const result = await updateRemoteReservation(id, fields, calPassword);
+  saveBtn.disabled = false;
+  saveBtn.textContent = "儲存變更";
+  if (!result.ok) {
+    showToast(result.reason === "密碼錯誤" ? "密碼錯誤，請重新登入管理模式" : "儲存失敗，請稍後再試");
+    return;
+  }
+  calReservations = calReservations.map((r) => (r.id === id ? { ...r, ...fields } : r));
+  closeCalEdit();
+  renderCalendar();
+  showToast("已更新訂位");
+});
 
 calPrevBtn.addEventListener("click", () => {
   calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1);

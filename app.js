@@ -211,6 +211,19 @@ async function updateRemoteReservationStatus(id, status, password) {
   }
 }
 
+async function updateRemoteReservation(id, fields, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=updateReservation&id=${encodeURIComponent(id)}&password=${encodeURIComponent(password)}&fields=${encodeURIComponent(JSON.stringify(fields))}`;
+    const data = await jsonp(url);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("更新訂位內容失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
 async function submitReservationRemote(data) {
   if (!isWebhookConfigured()) return false;
   try {
