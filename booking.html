@@ -135,6 +135,7 @@
       </div>
       <button type="submit" id="calEditSaveBtn">儲存變更</button>
       <button type="button" class="secondary" id="calEditCancelBtn">取消</button>
+      <p id="calEditMsg" style="margin-top:10px;font-size:0.85rem;"></p>
     </form>
   </div>
 </main>
@@ -429,6 +430,7 @@ function renderDayDetail() {
     calDayDetail.innerHTML = `<p class="empty-hint">${escapeHtml(calSelectedDate)} 沒有訂位</p>`;
     return;
   }
+  const statusOptions = ["待確認", "已確認", "已取消"];
   const rows = dayReservations.map((r) => `
     <tr>
       <td>${escapeHtml(r.time)}</td>
@@ -437,7 +439,11 @@ function renderDayDetail() {
       <td>${escapeHtml(r.people)} 位</td>
       <td>${escapeHtml(r.items) || "-"}</td>
       <td>${escapeHtml(r.note) || "-"}</td>
-      <td><span class="tag">${escapeHtml(r.status)}</span></td>
+      <td>
+        <select class="calStatusSelect" data-id="${r.id}">
+          ${statusOptions.map((s) => `<option value="${s}" ${r.status === s ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </td>
       <td><button type="button" class="secondary" onclick="openCalEdit('${r.id}')">編輯</button></td>
     </tr>
   `).join("");
@@ -450,6 +456,30 @@ function renderDayDetail() {
       <tbody>${rows}</tbody>
     </table>
   `;
+
+  calDayDetail.querySelectorAll(".calStatusSelect").forEach((sel) => {
+    sel.addEventListener("change", async () => {
+      const id = sel.dataset.id;
+      const newStatus = sel.value;
+      sel.disabled = true;
+      try {
+        const result = await updateRemoteReservationStatus(id, newStatus, calPassword);
+        if (!result.ok) {
+          showToast(result.reason === "密碼錯誤" ? "密碼錯誤，請重新登入管理模式" : "更新狀態失敗：" + (result.reason || "請稍後再試"));
+          sel.disabled = false;
+          renderDayDetail(); // 還原成更新前的狀態
+          return;
+        }
+        calReservations = calReservations.map((r) => (r.id === id ? { ...r, status: newStatus } : r));
+        showToast("已更新狀態");
+        renderCalendar();
+      } catch (err) {
+        console.error("更新狀態發生例外", err);
+        showToast("更新狀態失敗，請稍後再試");
+        sel.disabled = false;
+      }
+    });
+  });
 }
 
 function openCalEdit(id) {
@@ -464,44 +494,71 @@ function openCalEdit(id) {
   document.getElementById("calEditStatus").value = r.status || "待確認";
   document.getElementById("calEditItems").value = r.items || "";
   document.getElementById("calEditNote").value = r.note || "";
+  document.getElementById("calEditMsg").textContent = "";
   calEditForm.style.display = "block";
   calEditForm.scrollIntoView({ behavior: "smooth" });
 }
 window.openCalEdit = openCalEdit;
 
+const calEditMsg = document.getElementById("calEditMsg");
+
 function closeCalEdit() {
   calEditForm.style.display = "none";
   calEditForm.reset();
+  calEditMsg.textContent = "";
 }
 calEditCancelBtn.addEventListener("click", closeCalEdit);
 
 calEditForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const id = document.getElementById("calEditId").value;
-  const fields = {
-    name: document.getElementById("calEditName").value.trim(),
-    phone: document.getElementById("calEditPhone").value.trim(),
-    date: document.getElementById("calEditDate").value,
-    time: document.getElementById("calEditTime").value,
-    people: document.getElementById("calEditPeople").value,
-    status: document.getElementById("calEditStatus").value,
-    items: document.getElementById("calEditItems").value.trim(),
-    note: document.getElementById("calEditNote").value.trim(),
-  };
   const saveBtn = document.getElementById("calEditSaveBtn");
-  saveBtn.disabled = true;
-  saveBtn.textContent = "儲存中...";
-  const result = await updateRemoteReservation(id, fields, calPassword);
-  saveBtn.disabled = false;
-  saveBtn.textContent = "儲存變更";
-  if (!result.ok) {
-    showToast(result.reason === "密碼錯誤" ? "密碼錯誤，請重新登入管理模式" : "儲存失敗，請稍後再試");
-    return;
+  calEditMsg.textContent = "";
+  calEditMsg.style.color = "";
+
+  try {
+    const id = document.getElementById("calEditId").value;
+    if (!id) {
+      calEditMsg.style.color = "var(--danger)";
+      calEditMsg.textContent = "找不到訂位編號，請重新從明細點選「編輯」。";
+      return;
+    }
+    const fields = {
+      name: document.getElementById("calEditName").value.trim(),
+      phone: document.getElementById("calEditPhone").value.trim(),
+      date: document.getElementById("calEditDate").value,
+      time: document.getElementById("calEditTime").value,
+      people: document.getElementById("calEditPeople").value,
+      status: document.getElementById("calEditStatus").value,
+      items: document.getElementById("calEditItems").value.trim(),
+      note: document.getElementById("calEditNote").value.trim(),
+    };
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "儲存中...";
+    const result = await updateRemoteReservation(id, fields, calPassword);
+    saveBtn.disabled = false;
+    saveBtn.textContent = "儲存變更";
+
+    if (!result.ok) {
+      calEditMsg.style.color = "var(--danger)";
+      calEditMsg.textContent =
+        result.reason === "密碼錯誤"
+          ? "密碼錯誤，請關閉管理模式後重新登入。"
+          : "儲存失敗：" + (result.reason || "請確認 Apps Script 是否已部署最新版本，或稍後再試。");
+      return;
+    }
+
+    calReservations = calReservations.map((r) => (r.id === id ? { ...r, ...fields } : r));
+    closeCalEdit();
+    renderCalendar();
+    showToast("已更新訂位");
+  } catch (err) {
+    console.error("儲存訂位時發生例外", err);
+    saveBtn.disabled = false;
+    saveBtn.textContent = "儲存變更";
+    calEditMsg.style.color = "var(--danger)";
+    calEditMsg.textContent = "發生未預期的錯誤：" + (err && err.message ? err.message : String(err));
   }
-  calReservations = calReservations.map((r) => (r.id === id ? { ...r, ...fields } : r));
-  closeCalEdit();
-  renderCalendar();
-  showToast("已更新訂位");
 });
 
 calPrevBtn.addEventListener("click", () => {
