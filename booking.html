@@ -266,18 +266,26 @@ form.addEventListener("submit", async (e) => {
   submitBtn.disabled = true;
   submitBtn.textContent = "送出中...";
 
-  const sentToSheet = await submitToGoogleSheet(data);
-  Store.addReservation(data);
+  const result = await submitToGoogleSheet(data);
+  submitBtn.disabled = false;
+  submitBtn.textContent = "送出訂位";
 
+  // 時段衝突（同一場地 ±2 小時內已有其他訂位）：不算成功，不寫入本機紀錄、
+  // 不清空表單，讓客人可以直接改時間再送一次。
+  const isConflict = isWebhookConfigured() && !result.ok && result.reasonCode === "conflict";
+  if (isConflict) {
+    showToast(result.reason);
+    return;
+  }
+
+  Store.addReservation(data);
   form.reset();
   document.getElementById("people").value = 2;
   resetPreOrderInputs();
   renderList();
-  submitBtn.disabled = false;
-  submitBtn.textContent = "送出訂位";
 
   if (isWebhookConfigured()) {
-    showToast(sentToSheet ? "訂位已送出，並同步到 Google 試算表！" : "訂位已存本機，但同步試算表失敗，請確認網路或設定");
+    showToast(result.ok ? "訂位已送出，並同步到 Google 試算表！" : "訂位已存本機，但同步試算表失敗，請確認網路或設定");
   } else {
     showToast("訂位已送出（尚未同步試算表，請先完成設定）");
   }

@@ -225,14 +225,19 @@ async function updateRemoteReservation(id, fields, password) {
 }
 
 async function submitReservationRemote(data) {
-  if (!isWebhookConfigured()) return false;
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
   try {
     const url = `${WEBHOOK_URL}?action=submitReservation&data=${encodeURIComponent(JSON.stringify(data))}`;
     const result = await jsonp(url);
-    return !!(result && result.result === "success");
+    if (result && result.result === "success") return { ok: true, id: result.id };
+    return {
+      ok: false,
+      reason: result && result.message ? result.message : "unknown",
+      reasonCode: result && result.reasonCode ? result.reasonCode : undefined,
+    };
   } catch (err) {
     console.error("寫入 Google 試算表失敗", err);
-    return false;
+    return { ok: false, reason: "network" };
   }
 }
 
