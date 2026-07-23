@@ -327,3 +327,75 @@ footer.site-footer {
   font-size: 0.85rem;
   padding: 20px;
 }
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-cell {
+  min-height: 84px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  background: #fff;
+  overflow: hidden;
+}
+
+.calendar-cell:hover {
+  border-color: var(--accent);
+}
+
+.calendar-cell.empty {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-cell.today .cal-daynum {
+  color: var(--accent-dark);
+  text-decoration: underline;
+}
+
+.calendar-cell.has-reservation {
+  background: #fbf3e6;
+}
+
+.calendar-cell.selected {
+  border-color: var(--accent-dark);
+  border-width: 2px;
+}
+
+.cal-daynum {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.cal-entry {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-more {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}

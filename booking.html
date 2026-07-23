@@ -70,6 +70,30 @@
     </div>
     <div id="reservationList"></div>
   </div>
+
+  <div class="panel" id="calLoginPanel">
+    <h2 style="margin-top:0;">管理模式</h2>
+    <p style="color:var(--text-muted);font-size:0.9rem;">店家可在此登入查看行事曆，快速掌握每天的訂位狀況。密碼與菜單管理、訂位管理後台共用。</p>
+    <div class="field">
+      <label for="calPasswordInput">管理密碼</label>
+      <input type="password" id="calPasswordInput" placeholder="請輸入密碼" />
+    </div>
+    <button type="button" id="calLoginBtn">開啟管理模式</button>
+  </div>
+
+  <div class="panel" id="calPanel" style="display:none;">
+    <div class="toolbar">
+      <h2 style="margin:0;" id="calTitle">行事曆</h2>
+      <div>
+        <button type="button" class="secondary" id="calPrevBtn">‹ 上個月</button>
+        <button type="button" class="secondary" id="calNextBtn">下個月 ›</button>
+        <button type="button" class="secondary" id="calRefreshBtn">重新整理</button>
+        <button type="button" class="secondary" id="calCloseBtn">關閉管理模式</button>
+      </div>
+    </div>
+    <div id="calGrid"></div>
+    <div id="calDayDetail"></div>
+  </div>
 </main>
 
 <footer class="site-footer">© <span id="year"></span> yELLO VIP EXCLUSIVE｜此為系統雛形版本｜<a href="admin.html" style="color:inherit;">店家後台</a></footer>
@@ -222,6 +246,179 @@ renderList();
     renderPreOrderGroup(preOrderFoodEl, remote.food);
   }
 })();
+
+/* ===================================================================
+   管理模式：登入後顯示行事曆，把當月訂位簡要標註在對應日期上，
+   點選日期可看當天完整明細。密碼與菜單管理、admin.html 共用。
+   =================================================================== */
+
+const calLoginPanel = document.getElementById("calLoginPanel");
+const calPanel = document.getElementById("calPanel");
+const calPasswordInput = document.getElementById("calPasswordInput");
+const calLoginBtn = document.getElementById("calLoginBtn");
+const calPrevBtn = document.getElementById("calPrevBtn");
+const calNextBtn = document.getElementById("calNextBtn");
+const calRefreshBtn = document.getElementById("calRefreshBtn");
+const calCloseBtn = document.getElementById("calCloseBtn");
+const calGrid = document.getElementById("calGrid");
+const calTitle = document.getElementById("calTitle");
+const calDayDetail = document.getElementById("calDayDetail");
+
+let calPassword = "";
+let calReservations = [];
+let calViewDate = new Date();
+let calSelectedDate = null;
+
+if (!isWebhookConfigured()) {
+  calLoginBtn.disabled = true;
+}
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+async function calLogin() {
+  const pw = calPasswordInput.value.trim();
+  if (!pw) {
+    showToast("請輸入密碼");
+    return;
+  }
+  calPassword = pw;
+  calLoginBtn.disabled = true;
+  calLoginBtn.textContent = "登入中...";
+  const result = await fetchRemoteReservations(calPassword);
+  calLoginBtn.disabled = false;
+  calLoginBtn.textContent = "開啟管理模式";
+  if (!result.ok) {
+    showToast(result.reason === "密碼錯誤" ? "密碼錯誤，請重新輸入" : "讀取失敗，請稍後再試");
+    return;
+  }
+  calReservations = result.reservations;
+  calLoginPanel.style.display = "none";
+  calPanel.style.display = "block";
+  calViewDate = new Date();
+  calSelectedDate = null;
+  renderCalendar();
+}
+
+calLoginBtn.addEventListener("click", calLogin);
+calPasswordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") calLogin();
+});
+
+calCloseBtn.addEventListener("click", () => {
+  calPanel.style.display = "none";
+  calLoginPanel.style.display = "block";
+  calPasswordInput.value = "";
+  calPassword = "";
+});
+
+async function calRefresh() {
+  const result = await fetchRemoteReservations(calPassword);
+  if (result.ok) {
+    calReservations = result.reservations;
+    renderCalendar();
+    showToast("行事曆已重新整理");
+  } else {
+    showToast("讀取失敗，請稍後再試");
+  }
+}
+calRefreshBtn.addEventListener("click", calRefresh);
+
+function renderCalendar() {
+  const year = calViewDate.getFullYear();
+  const month = calViewDate.getMonth(); // 0-based
+  calTitle.textContent = `${year} 年 ${month + 1} 月`;
+
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const byDate = {};
+  calReservations.forEach((r) => {
+    if (!r.date) return;
+    if (!byDate[r.date]) byDate[r.date] = [];
+    byDate[r.date].push(r);
+  });
+
+  const weekdayLabels = ["日", "一", "二", "三", "四", "五", "六"];
+  let html = '<div class="calendar-weekdays">' + weekdayLabels.map((w) => `<div>${w}</div>`).join("") + "</div>";
+  html += '<div class="calendar-grid">';
+
+  for (let i = 0; i < startWeekday; i++) {
+    html += '<div class="calendar-cell empty"></div>';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${pad2(month + 1)}-${pad2(d)}`;
+    const dayReservations = byDate[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === calSelectedDate;
+    const preview = dayReservations.slice(0, 2).map((r) => `<div class="cal-entry">${escapeHtml(r.time || "")} ${escapeHtml(r.name)}</div>`).join("");
+    const more = dayReservations.length > 2 ? `<div class="cal-more">+${dayReservations.length - 2} 筆</div>` : "";
+    html += `
+      <div class="calendar-cell ${isToday ? "today" : ""} ${dayReservations.length ? "has-reservation" : ""} ${isSelected ? "selected" : ""}" data-date="${dateStr}">
+        <div class="cal-daynum">${d}</div>
+        ${preview}
+        ${more}
+      </div>
+    `;
+  }
+
+  html += "</div>";
+  calGrid.innerHTML = html;
+
+  calGrid.querySelectorAll(".calendar-cell[data-date]").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      calSelectedDate = cell.dataset.date;
+      renderCalendar();
+      renderDayDetail();
+    });
+  });
+
+  if (calSelectedDate) renderDayDetail();
+  else calDayDetail.innerHTML = "";
+}
+
+function renderDayDetail() {
+  const dayReservations = calReservations.filter((r) => r.date === calSelectedDate);
+  if (dayReservations.length === 0) {
+    calDayDetail.innerHTML = `<p class="empty-hint">${escapeHtml(calSelectedDate)} 沒有訂位</p>`;
+    return;
+  }
+  const rows = dayReservations.map((r) => `
+    <tr>
+      <td>${escapeHtml(r.time)}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.people)} 位</td>
+      <td>${escapeHtml(r.items) || "-"}</td>
+      <td>${escapeHtml(r.note) || "-"}</td>
+      <td><span class="tag">${escapeHtml(r.status)}</span></td>
+    </tr>
+  `).join("");
+  calDayDetail.innerHTML = `
+    <h3 style="margin-top:20px;">${escapeHtml(calSelectedDate)} 訂位明細</h3>
+    <table>
+      <thead>
+        <tr><th>時間</th><th>姓名</th><th>電話</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+calPrevBtn.addEventListener("click", () => {
+  calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1);
+  calSelectedDate = null;
+  renderCalendar();
+});
+calNextBtn.addEventListener("click", () => {
+  calViewDate = new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1);
+  calSelectedDate = null;
+  renderCalendar();
+});
 </script>
 </body>
 </html>
