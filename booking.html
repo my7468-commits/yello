@@ -37,6 +37,10 @@
           <input type="tel" id="phone" required placeholder="0912-345-678" />
         </div>
       </div>
+      <div class="field">
+        <label for="email">電子郵件 *</label>
+        <input type="email" id="email" required placeholder="you@example.com" />
+      </div>
       <div class="row-2">
         <div class="field">
           <label for="date">日期 *</label>
@@ -100,6 +104,10 @@
           <label for="calEditPhone">電話</label>
           <input type="tel" id="calEditPhone" />
         </div>
+      </div>
+      <div class="field">
+        <label for="calEditEmail">Email</label>
+        <input type="email" id="calEditEmail" />
       </div>
       <div class="row-2">
         <div class="field">
@@ -212,6 +220,7 @@ function renderList() {
     <tr>
       <td>${escapeHtml(r.name)}</td>
       <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.email) || "-"}</td>
       <td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td>
       <td>${escapeHtml(r.people)} 位</td>
       <td>${escapeHtml(formatPreOrderItems(r.preOrderItems))}</td>
@@ -225,7 +234,7 @@ function renderList() {
     <table>
       <thead>
         <tr>
-          <th>姓名</th><th>電話</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th>
+          <th>姓名</th><th>電話</th><th>Email</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -256,6 +265,7 @@ form.addEventListener("submit", async (e) => {
     id: uid("r"),
     name: document.getElementById("name").value.trim(),
     phone: document.getElementById("phone").value.trim(),
+    email: document.getElementById("email").value.trim(),
     date: document.getElementById("date").value,
     time: document.getElementById("time").value,
     people: document.getElementById("people").value,
@@ -270,10 +280,13 @@ form.addEventListener("submit", async (e) => {
   submitBtn.disabled = false;
   submitBtn.textContent = "送出訂位";
 
-  // 時段衝突（同一場地 ±2 小時內已有其他訂位）：不算成功，不寫入本機紀錄、
-  // 不清空表單，讓客人可以直接改時間再送一次。
-  const isConflict = isWebhookConfigured() && !result.ok && result.reasonCode === "conflict";
-  if (isConflict) {
+  // 時段衝突（同一場地 ±2 小時內已有其他訂位）或缺少 Email：不算成功，
+  // 不寫入本機紀錄、不清空表單，讓客人可以直接修正後再送一次。
+  const isRejected =
+    isWebhookConfigured() &&
+    !result.ok &&
+    (result.reasonCode === "conflict" || result.reasonCode === "missing_email");
+  if (isRejected) {
     showToast(result.reason);
     return;
   }
@@ -444,6 +457,7 @@ function renderDayDetail() {
       <td>${escapeHtml(r.time)}</td>
       <td>${escapeHtml(r.name)}</td>
       <td>${escapeHtml(r.phone)}</td>
+      <td>${escapeHtml(r.email) || "-"}</td>
       <td>${escapeHtml(r.people)} 位</td>
       <td>${escapeHtml(r.items) || "-"}</td>
       <td>${escapeHtml(r.note) || "-"}</td>
@@ -459,7 +473,7 @@ function renderDayDetail() {
     <h3 style="margin-top:20px;">${escapeHtml(calSelectedDate)} 訂位明細</h3>
     <table>
       <thead>
-        <tr><th>時間</th><th>姓名</th><th>電話</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th></tr>
+        <tr><th>時間</th><th>姓名</th><th>電話</th><th>Email</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -496,6 +510,7 @@ function openCalEdit(id) {
   document.getElementById("calEditId").value = r.id;
   document.getElementById("calEditName").value = r.name || "";
   document.getElementById("calEditPhone").value = r.phone || "";
+  document.getElementById("calEditEmail").value = r.email || "";
   document.getElementById("calEditDate").value = r.date || "";
   document.getElementById("calEditTime").value = r.time || "";
   document.getElementById("calEditPeople").value = r.people || "";
@@ -533,6 +548,7 @@ calEditForm.addEventListener("submit", async (e) => {
     const fields = {
       name: document.getElementById("calEditName").value.trim(),
       phone: document.getElementById("calEditPhone").value.trim(),
+      email: document.getElementById("calEditEmail").value.trim(),
       date: document.getElementById("calEditDate").value,
       time: document.getElementById("calEditTime").value,
       people: document.getElementById("calEditPeople").value,
