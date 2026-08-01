@@ -82,6 +82,30 @@ main {
   font-size: 1.05rem;
 }
 
+.welcome-text {
+  max-width: 640px;
+  margin: 0 auto;
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1.9;
+}
+
+.contact-section {
+  margin-top: 40px;
+}
+
+.map-embed {
+  max-width: 640px;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.map-embed iframe {
+  display: block;
+}
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
