@@ -90,6 +90,13 @@ main {
   line-height: 1.9;
 }
 
+.welcome-lead {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  margin-bottom: 4px;
+}
+
 .contact-section {
   margin-top: 40px;
 }
