@@ -3,86 +3,41 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>yELLO VIP EXCLUSIVE - 首頁</title>
+<title>yELLO VIP EXCLUSIVE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;700&family=Yuji+Syuku&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-<header class="site-header">
-  <a class="brand" href="index.html">yELLO VIP EXCLUSIVE</a>
-  <nav class="site-nav">
-    <a href="index.html" class="active">首頁</a>
-    <a href="booking.html">訂位</a>
-    <a href="menu.html">菜單</a>
-  </nav>
+<body class="entrance-page">
+
+<div class="bg-carousel" aria-hidden="true">
+  <img src="corner-chair.jpg" alt="" />
+  <img src="bar-shelf.jpg" alt="" />
+  <img src="bar-corner.jpg" alt="" />
+  <img src="lounge-corner.jpg" alt="" />
+  <img src="lounge-detail.jpg" alt="" />
+  <img src="long-table.jpg" alt="" />
+</div>
+<div class="bg-overlay"></div>
+
+<header class="site-header entrance-header">
+  <a class="brand" href="home.html">yELLO VIP EXCLUSIVE</a>
 </header>
 
-<section class="hero-banner" style="background-image:url('long-table.jpg');">
-  <div class="hero-banner-overlay">
+<main class="entrance-main">
+  <div class="entrance-textbox">
     <p class="welcome-text welcome-lead">朋友，歡迎來yELLO！</p>
     <p class="welcome-text">這裡是個邀請制的私人俱樂部，我們精心打造，希望能讓你們在這裡放鬆身心，玩得開心盡興。無論是想與朋友小酌，還是享受獨處時光，yELLO都能滿足你的需求。我們有提供各式酒類、餐點，不過因為我們不是真的店家，所以有想吃喝的請先預訂，我們很樂意幫你們準備!</p>
   </div>
-</section>
 
-<main>
-  <div class="card-grid">
-    <a class="entry-card" href="booking.html">
-      <span class="icon">📅</span>
-      <h2>線上訂位</h2>
-      <p>填寫姓名、人數與時間，快速預約座位。</p>
-    </a>
-    <a class="entry-card" href="menu.html">
-      <span class="icon">📖</span>
-      <h2>看菜單</h2>
-      <p>瀏覽最新食物與酒單品項。</p>
-    </a>
-  </div>
-
-  <section class="gallery-section">
-    <h2>空間一隅</h2>
-    <div class="gallery-grid">
-      <a href="sign.jpg" target="_blank" rel="noopener" class="gallery-tall">
-        <img src="sign.jpg" alt="yELLO 招牌" loading="lazy" />
-      </a>
-      <a href="corner-chair.jpg" target="_blank" rel="noopener" class="gallery-wide">
-        <img src="corner-chair.jpg" alt="復古藤椅一隅" loading="lazy" />
-      </a>
-      <a href="bar-shelf.jpg" target="_blank" rel="noopener">
-        <img src="bar-shelf.jpg" alt="酒櫃展示" loading="lazy" />
-      </a>
-      <a href="lounge-corner.jpg" target="_blank" rel="noopener">
-        <img src="lounge-corner.jpg" alt="沙發休憩區" loading="lazy" />
-      </a>
-      <a href="bar-corner.jpg" target="_blank" rel="noopener" class="gallery-wide">
-        <img src="bar-corner.jpg" alt="吧台一隅" loading="lazy" />
-      </a>
-      <a href="lounge-detail.jpg" target="_blank" rel="noopener">
-        <img src="lounge-detail.jpg" alt="復古擺設細節" loading="lazy" />
-      </a>
-    </div>
-  </section>
-
-  <section class="panel contact-section">
-    <h2 style="text-align:center;margin-top:0;">聯絡我們</h2>
-    <p style="text-align:center;margin:4px 0;">電話：<a href="tel:0916869519" style="color:inherit;">0916869519</a></p>
-    <p style="text-align:center;margin:4px 0 20px;">地址：桃園市平鎮區新興路251巷10號</p>
-    <div class="map-embed">
-      <iframe
-        src="https://www.google.com/maps?q=%E6%A1%83%E5%9C%92%E5%B8%82%E5%B9%B3%E9%8E%AE%E5%8D%80%E6%96%B0%E8%88%88%E8%B7%AF251%E5%B7%B710%E8%99%9F&output=embed"
-        width="100%"
-        height="300"
-        style="border:0;"
-        allowfullscreen=""
-        loading="lazy"
-        referrerpolicy="no-referrer-when-downgrade"
-      ></iframe>
-    </div>
-  </section>
+  <a class="sign-link" href="home.html" aria-label="點擊招牌，進入 yELLO 首頁">
+    <img src="sign.jpg" alt="yELLO VIP EXCLUSIVE 招牌" />
+  </a>
+  <p class="entrance-hint">點擊招牌，進入 yELLO</p>
 </main>
 
-<footer class="site-footer">© <span id="year"></span> yELLO VIP EXCLUSIVE｜此為系統雛形版本｜<a href="admin.html" style="color:inherit;">店家後台</a></footer>
+<footer class="site-footer entrance-footer">© <span id="year"></span> yELLO VIP EXCLUSIVE｜<a href="admin.html">店家後台</a></footer>
 <script>document.getElementById("year").textContent = new Date().getFullYear();</script>
 </body>
 </html>
