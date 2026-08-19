@@ -97,6 +97,102 @@ main {
   margin-bottom: 4px;
 }
 
+/* ---- 首頁全寬圖片橫幅 ---- */
+.hero-banner {
+  position: relative;
+  width: 100%;
+  min-height: 64vh;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20,15,10,0.25) 0%, rgba(20,15,10,0.72) 100%);
+}
+
+.hero-banner-overlay {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  color: #fff;
+  padding: 20px;
+  max-width: 680px;
+}
+
+.hero-banner-overlay .welcome-lead {
+  color: #fff;
+  font-size: 2rem;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.hero-banner-overlay .welcome-text {
+  color: #f3ece0;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+}
+
+@media (max-width: 600px) {
+  .hero-banner { min-height: 48vh; }
+  .hero-banner-overlay .welcome-lead { font-size: 1.5rem; }
+  .hero-banner-overlay .welcome-text { font-size: 1rem; }
+}
+
+/* ---- 空間相片 bento 網格 ---- */
+.gallery-section {
+  margin-top: 48px;
+}
+
+.gallery-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 190px;
+  grid-auto-flow: dense;
+  gap: 10px;
+}
+
+.gallery-grid a {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.gallery-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: brightness(0.94);
+  transition: transform 0.5s ease, filter 0.5s ease;
+}
+
+.gallery-grid a:hover img {
+  transform: scale(1.05);
+  filter: brightness(1);
+}
+
+.gallery-grid .gallery-tall { grid-row: span 2; }
+.gallery-grid .gallery-wide { grid-column: span 2; }
+
+@media (max-width: 700px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 160px;
+  }
+}
+
 .contact-section {
   margin-top: 40px;
 }
