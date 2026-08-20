@@ -20,6 +20,19 @@
   <img src="long-table.jpg" alt="" />
 </div>
 <div class="bg-overlay"></div>
+<script>
+// 背景輪播的動畫進度改用「現實時間」換算，而不是每個頁面各自從 0 秒開始播，
+// 這樣切換頁面時輪播不會被重置，感覺像是同一組輪播接續播放。
+// 這裡的 42（總週期）跟 7（每張間隔）要跟 style.css 的 bgCarouselFade 設定一致。
+(function () {
+  var cycle = 42, stagger = 7;
+  var now = Date.now() / 1000;
+  document.querySelectorAll(".bg-carousel img").forEach(function (img, i) {
+    var offset = ((now - i * stagger) % cycle + cycle) % cycle;
+    img.style.animationDelay = "-" + offset.toFixed(2) + "s";
+  });
+})();
+</script>
 
 <header class="site-header">
   <a class="brand" href="home.html">yELLO VIP EXCLUSIVE</a>
