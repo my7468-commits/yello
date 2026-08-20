@@ -98,8 +98,8 @@ main {
 }
 
 /* ===================================================================
-   入口動畫頁（index.html）：背景是空間照片輪播，上面疊一個色塊放歡迎詞，
-   下方是招牌照片，點擊後進入 home.html。
+   入口動畫頁（index.html）：純色背景，只有招牌照片用動畫呈現，
+   點擊招牌照片進入 home.html。
    =================================================================== */
 
 body.entrance-page {
@@ -108,10 +108,92 @@ body.entrance-page {
 
 .entrance-page .site-header.entrance-header {
   justify-content: center;
-  background: transparent;
-  position: relative;
-  z-index: 2;
 }
+
+.entrance-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px 70px;
+  min-height: calc(100vh - 90px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.entrance-textbox {
+  background: var(--accent-dark);
+  color: #fff;
+  padding: 32px 30px;
+  border-radius: var(--radius);
+  max-width: 560px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.entrance-textbox .welcome-lead {
+  color: #fff;
+  text-shadow: none;
+}
+
+.entrance-textbox .welcome-text {
+  color: #f6ecdd;
+}
+
+.sign-link {
+  display: block;
+  margin: 40px auto 12px;
+  max-width: 260px;
+  animation: signIn 1s ease-out;
+}
+
+.sign-link img {
+  width: 100%;
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 14px 45px rgba(0,0,0,0.35);
+  animation: signFloat 4.5s ease-in-out infinite;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.sign-link:hover img {
+  transform: scale(1.05);
+  box-shadow: 0 18px 55px rgba(0,0,0,0.45);
+}
+
+@keyframes signIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes signFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.entrance-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  animation: hintPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  .entrance-textbox { padding: 24px 20px; }
+  .sign-link { max-width: 200px; margin-top: 24px; }
+}
+
+/* ===================================================================
+   其它頁面（home / booking / menu）的空間照片背景輪播：
+   固定滿版淡入淡出播放，上面疊一層深色濾鏡，內容區的卡片/面板本身
+   已經是不透明底色所以不受影響；沒有卡片包住的標題、分類頁籤才需要
+   額外套一層淺色底避免看不清楚。
+   =================================================================== */
 
 .bg-carousel {
   position: fixed;
@@ -152,94 +234,48 @@ body.entrance-page {
   background: rgba(12,9,6,0.6);
 }
 
-.entrance-main {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 40px 20px 70px;
-  min-height: calc(100vh - 90px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.entrance-textbox {
-  background: var(--accent-dark);
-  color: #fff;
-  padding: 32px 30px;
-  border-radius: var(--radius);
-  max-width: 560px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.45);
-}
-
-.entrance-textbox .welcome-lead {
-  color: #fff;
-  text-shadow: none;
-}
-
-.entrance-textbox .welcome-text {
-  color: #f6ecdd;
-}
-
-.sign-link {
-  display: block;
-  margin: 40px auto 12px;
-  max-width: 260px;
-  animation: signIn 1s ease-out;
-}
-
-.sign-link img {
-  width: 100%;
-  display: block;
-  border-radius: 6px;
-  box-shadow: 0 14px 45px rgba(0,0,0,0.55);
-  animation: signFloat 4.5s ease-in-out infinite;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.sign-link:hover img {
-  transform: scale(1.05);
-  box-shadow: 0 18px 55px rgba(0,0,0,0.65);
-}
-
-@keyframes signIn {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes signFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-.entrance-hint {
-  color: #f3ece0;
-  font-size: 0.85rem;
-  letter-spacing: 1px;
-  opacity: 0.85;
-  animation: hintPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes hintPulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.95; }
-}
-
-.entrance-footer {
-  position: relative;
-  z-index: 2;
+body.with-bg-carousel {
   background: transparent;
+}
+
+body.with-bg-carousel main > h1 {
+  background: rgba(255,255,255,0.94);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px 24px;
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 24px;
+}
+
+body.with-bg-carousel .hero {
+  background: rgba(255,255,255,0.92);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 32px 20px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+body.with-bg-carousel .tabs {
+  background: rgba(255,255,255,0.92);
+  padding: 8px 12px 0;
+  border-radius: 10px;
+  border-bottom: none;
+  box-shadow: var(--shadow);
+}
+
+/* main 下面沒有被 .panel 包住的工具列（例如「開啟管理模式」按鈕列），
+   單獨補一層淺色底，避免直接浮在照片背景上看不清楚。 */
+body.with-bg-carousel main > .toolbar {
+  background: rgba(255,255,255,0.9);
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+body.with-bg-carousel footer.site-footer {
   color: #f3ece0;
-}
-
-.entrance-footer a {
-  color: inherit;
-}
-
-@media (max-width: 600px) {
-  .entrance-textbox { padding: 24px 20px; }
-  .sign-link { max-width: 200px; margin-top: 24px; }
 }
 
 .contact-section {
