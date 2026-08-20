@@ -278,6 +278,14 @@ body.with-bg-carousel footer.site-footer {
   color: #f3ece0;
 }
 
+/* 「線上訂位」「看菜單」入口卡片、「聯絡我們」、訂位表單、我的訂位紀錄、
+   行事曆面板、菜單頁面各面板……所有原本純白不透明的卡片，統一調成
+   半透明（原本 100% 不透明，調淡 30% 變成 70% 不透明），讓背景輪播透出來。 */
+body.with-bg-carousel .panel,
+body.with-bg-carousel .entry-card {
+  background: rgba(255,255,255,0.7);
+}
+
 .contact-section {
   margin-top: 40px;
 }
