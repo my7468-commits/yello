@@ -239,7 +239,7 @@ body.with-bg-carousel {
 }
 
 body.with-bg-carousel main > h1 {
-  background: rgba(255,255,255,0.94);
+  background: rgba(255,255,255,0.66);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 18px 24px;
@@ -249,7 +249,7 @@ body.with-bg-carousel main > h1 {
 }
 
 body.with-bg-carousel .hero {
-  background: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.64);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 32px 20px;
@@ -258,7 +258,7 @@ body.with-bg-carousel .hero {
 }
 
 body.with-bg-carousel .tabs {
-  background: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.64);
   padding: 8px 12px 0;
   border-radius: 10px;
   border-bottom: none;
@@ -268,7 +268,7 @@ body.with-bg-carousel .tabs {
 /* main 下面沒有被 .panel 包住的工具列（例如「開啟管理模式」按鈕列），
    單獨補一層淺色底，避免直接浮在照片背景上看不清楚。 */
 body.with-bg-carousel main > .toolbar {
-  background: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.63);
   padding: 12px 16px;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
