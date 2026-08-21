@@ -123,21 +123,19 @@ body.entrance-page {
 }
 
 .entrance-textbox {
-  background: var(--accent-dark);
-  color: #fff;
+  background: transparent;
+  color: var(--text);
   padding: 32px 30px;
-  border-radius: var(--radius);
   max-width: 560px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
 }
 
 .entrance-textbox .welcome-lead {
-  color: #fff;
+  color: var(--text);
   text-shadow: none;
 }
 
 .entrance-textbox .welcome-text {
-  color: #f6ecdd;
+  color: var(--text);
 }
 
 .sign-link {
