@@ -49,6 +49,7 @@
   <div class="tabs">
     <button type="button" class="active" data-tab="food">🍽 食物</button>
     <button type="button" data-tab="alcohol">🍷 酒單</button>
+    <button type="button" data-tab="delivery">🛵 外送推薦</button>
   </div>
 
   <div class="panel">
@@ -64,18 +65,22 @@
           <label for="itemName">品名 *</label>
           <input type="text" id="itemName" required />
         </div>
-        <div class="field">
+        <div class="field" id="priceFieldWrap">
           <label for="itemPrice">價格（元） *</label>
-          <input type="number" id="itemPrice" min="0" required />
+          <input type="number" id="itemPrice" min="0" />
         </div>
       </div>
       <div class="field">
-        <label for="itemDesc">說明</label>
+        <label for="itemDesc" id="itemDescLabel">說明</label>
         <input type="text" id="itemDesc" placeholder="食材、口味描述等" />
       </div>
       <div class="field" id="categoryFieldWrap" style="display:none;">
         <label for="itemCategory">分類</label>
         <select id="itemCategory"></select>
+      </div>
+      <div class="field" id="linkFieldWrap" style="display:none;">
+        <label for="itemLink">訂購連結</label>
+        <input type="url" id="itemLink" placeholder="https://..." />
       </div>
       <div class="field">
         <label><input type="checkbox" id="itemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
@@ -113,6 +118,10 @@ const form = document.getElementById("itemForm");
 const syncNotice = document.getElementById("syncNotice");
 const categoryFieldWrap = document.getElementById("categoryFieldWrap");
 const categorySelect = document.getElementById("itemCategory");
+const priceFieldWrap = document.getElementById("priceFieldWrap");
+const priceInput = document.getElementById("itemPrice");
+const linkFieldWrap = document.getElementById("linkFieldWrap");
+const itemDescLabel = document.getElementById("itemDescLabel");
 
 categorySelect.innerHTML = ALCOHOL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
@@ -121,11 +130,14 @@ if (!isWebhookConfigured()) {
 }
 
 function getCurrentMenu() {
-  return currentTab === "food" ? Store.getFoodMenu() : Store.getAlcoholMenu();
+  if (currentTab === "food") return Store.getFoodMenu();
+  if (currentTab === "alcohol") return Store.getAlcoholMenu();
+  return Store.getDeliveryMenu();
 }
 function saveCurrentMenu(list) {
   if (currentTab === "food") Store.saveFoodMenu(list);
-  else Store.saveAlcoholMenu(list);
+  else if (currentTab === "alcohol") Store.saveAlcoholMenu(list);
+  else Store.saveDeliveryMenu(list);
 }
 
 async function persistMenuChange(list) {
@@ -148,6 +160,7 @@ function renderMenuItem(item) {
       <div class="info">
         <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
         <p>${escapeHtml(item.desc || "")}</p>
+        ${currentTab === "delivery" && item.link ? `<p><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">前往訂購 ↗</a></p>` : ""}
         ${adminMode ? `
           <div class="actions">
             <button type="button" class="secondary" onclick="editItem('${item.id}')">編輯</button>
@@ -190,9 +203,13 @@ function editItem(id) {
   if (!item) return;
   document.getElementById("editId").value = item.id;
   document.getElementById("itemName").value = item.name;
-  document.getElementById("itemPrice").value = item.price;
   document.getElementById("itemDesc").value = item.desc || "";
   document.getElementById("itemAvailable").checked = item.available !== false;
+  if (currentTab === "delivery") {
+    document.getElementById("itemLink").value = item.link || "";
+  } else {
+    priceInput.value = item.price;
+  }
   if (currentTab === "alcohol") {
     categorySelect.value = ALCOHOL_CATEGORIES.includes(item.category) ? item.category : "其它";
   }
@@ -215,6 +232,12 @@ function resetForm() {
   document.getElementById("editId").value = "";
   document.getElementById("itemAvailable").checked = true;
   categoryFieldWrap.style.display = currentTab === "alcohol" ? "block" : "none";
+  const isDelivery = currentTab === "delivery";
+  priceFieldWrap.style.display = isDelivery ? "none" : "block";
+  priceInput.required = !isDelivery;
+  linkFieldWrap.style.display = isDelivery ? "block" : "none";
+  itemDescLabel.textContent = isDelivery ? "店家簡介" : "說明";
+  document.getElementById("itemDesc").placeholder = isDelivery ? "推薦原因、招牌餐點等" : "食材、口味描述等";
   document.getElementById("addPanelTitle").textContent = "新增品項";
   document.getElementById("submitBtn").textContent = "新增品項";
 }
@@ -224,10 +247,15 @@ form.addEventListener("submit", async (e) => {
   const id = document.getElementById("editId").value;
   const data = {
     name: document.getElementById("itemName").value.trim(),
-    price: Number(document.getElementById("itemPrice").value),
     desc: document.getElementById("itemDesc").value.trim(),
     available: document.getElementById("itemAvailable").checked,
   };
+  if (currentTab === "delivery") {
+    data.link = document.getElementById("itemLink").value.trim();
+    data.price = 0;
+  } else {
+    data.price = Number(priceInput.value);
+  }
   if (currentTab === "alcohol") {
     data.category = categorySelect.value;
   }

@@ -50,6 +50,7 @@
     <div class="tabs">
       <button type="button" class="active" data-menutab="food">🍽 食物</button>
       <button type="button" data-menutab="alcohol">🍷 酒單</button>
+      <button type="button" data-menutab="delivery">🛵 外送推薦</button>
     </div>
 
     <div id="adminMenuList"></div>
@@ -64,18 +65,22 @@
           <label for="menuItemName">品名 *</label>
           <input type="text" id="menuItemName" required />
         </div>
-        <div class="field">
+        <div class="field" id="menuPriceFieldWrap">
           <label for="menuItemPrice">價格（元，客人不會看到，供未來收費使用）</label>
           <input type="number" id="menuItemPrice" min="0" />
         </div>
       </div>
       <div class="field">
-        <label for="menuItemDesc">說明</label>
+        <label for="menuItemDesc" id="menuItemDescLabel">說明</label>
         <input type="text" id="menuItemDesc" placeholder="食材、口味描述等" />
       </div>
       <div class="field" id="menuCategoryFieldWrap" style="display:none;">
         <label for="menuItemCategory">分類</label>
         <select id="menuItemCategory"></select>
+      </div>
+      <div class="field" id="menuLinkFieldWrap" style="display:none;">
+        <label for="menuItemLink">訂購連結</label>
+        <input type="url" id="menuItemLink" placeholder="https://..." />
       </div>
       <div class="field">
         <label><input type="checkbox" id="menuItemAvailable" checked style="width:auto;display:inline-block;margin-right:6px;" />目前供應中</label>
@@ -108,6 +113,10 @@ const menuTabs = document.querySelectorAll("[data-menutab]");
 const menuItemForm = document.getElementById("menuItemForm");
 const menuCategoryFieldWrap = document.getElementById("menuCategoryFieldWrap");
 const menuCategorySelect = document.getElementById("menuItemCategory");
+const menuPriceFieldWrap = document.getElementById("menuPriceFieldWrap");
+const menuPriceInput = document.getElementById("menuItemPrice");
+const menuLinkFieldWrap = document.getElementById("menuLinkFieldWrap");
+const menuItemDescLabel = document.getElementById("menuItemDescLabel");
 
 menuCategorySelect.innerHTML = ALCOHOL_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join("");
 
@@ -115,6 +124,7 @@ let adminPassword = "";
 let menuTab = "food";
 let currentFoodMenu = [];
 let currentAlcoholMenu = [];
+let currentDeliveryMenu = [];
 
 if (!isWebhookConfigured()) {
   syncNotice.textContent = "尚未設定共用試算表連結，無法讀取訂位。請先完成 config.js 的 WEBHOOK_URL 設定。";
@@ -230,11 +240,14 @@ refreshBtn.addEventListener("click", loadReservations);
    =================================================================== */
 
 function getCurrentAdminMenu() {
-  return menuTab === "food" ? currentFoodMenu : currentAlcoholMenu;
+  if (menuTab === "food") return currentFoodMenu;
+  if (menuTab === "alcohol") return currentAlcoholMenu;
+  return currentDeliveryMenu;
 }
 function setCurrentAdminMenu(list) {
   if (menuTab === "food") currentFoodMenu = list;
-  else currentAlcoholMenu = list;
+  else if (menuTab === "alcohol") currentAlcoholMenu = list;
+  else currentDeliveryMenu = list;
 }
 
 async function loadMenu() {
@@ -243,9 +256,11 @@ async function loadMenu() {
   if (remote) {
     currentFoodMenu = remote.food;
     currentAlcoholMenu = remote.alcohol;
+    currentDeliveryMenu = remote.delivery || Store.getDeliveryMenu();
   } else {
     currentFoodMenu = Store.getFoodMenu();
     currentAlcoholMenu = Store.getAlcoholMenu();
+    currentDeliveryMenu = Store.getDeliveryMenu();
   }
   renderAdminMenu();
 }
@@ -256,6 +271,7 @@ function renderAdminMenuItem(item) {
       <div class="info">
         <h3>${escapeHtml(item.name)} ${item.available === false ? '<span class="tag">暫停供應</span>' : ""}</h3>
         <p>${escapeHtml(item.desc || "")}</p>
+        ${menuTab === "delivery" && item.link ? `<p><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">前往訂購 ↗</a></p>` : ""}
         <div class="actions">
           <button type="button" class="secondary" onclick="editMenuItem('${item.id}')">編輯</button>
           <button type="button" class="danger" onclick="deleteMenuItem('${item.id}')">刪除</button>
@@ -310,9 +326,13 @@ function editMenuItem(id) {
   if (!item) return;
   document.getElementById("menuEditId").value = item.id;
   document.getElementById("menuItemName").value = item.name;
-  document.getElementById("menuItemPrice").value = item.price || "";
   document.getElementById("menuItemDesc").value = item.desc || "";
   document.getElementById("menuItemAvailable").checked = item.available !== false;
+  if (menuTab === "delivery") {
+    document.getElementById("menuItemLink").value = item.link || "";
+  } else {
+    menuPriceInput.value = item.price || "";
+  }
   if (menuTab === "alcohol") {
     menuCategorySelect.value = ALCOHOL_CATEGORIES.includes(item.category) ? item.category : "其它";
   }
@@ -334,6 +354,11 @@ function resetMenuForm() {
   document.getElementById("menuEditId").value = "";
   document.getElementById("menuItemAvailable").checked = true;
   menuCategoryFieldWrap.style.display = menuTab === "alcohol" ? "block" : "none";
+  const isDelivery = menuTab === "delivery";
+  menuPriceFieldWrap.style.display = isDelivery ? "none" : "block";
+  menuLinkFieldWrap.style.display = isDelivery ? "block" : "none";
+  menuItemDescLabel.textContent = isDelivery ? "店家簡介" : "說明";
+  document.getElementById("menuItemDesc").placeholder = isDelivery ? "推薦原因、招牌餐點等" : "食材、口味描述等";
   document.getElementById("menuFormTitle").textContent = "新增品項";
   document.getElementById("menuSubmitBtn").textContent = "新增品項";
 }
@@ -343,10 +368,15 @@ menuItemForm.addEventListener("submit", async (e) => {
   const id = document.getElementById("menuEditId").value;
   const data = {
     name: document.getElementById("menuItemName").value.trim(),
-    price: Number(document.getElementById("menuItemPrice").value) || 0,
     desc: document.getElementById("menuItemDesc").value.trim(),
     available: document.getElementById("menuItemAvailable").checked,
   };
+  if (menuTab === "delivery") {
+    data.link = document.getElementById("menuItemLink").value.trim();
+    data.price = 0;
+  } else {
+    data.price = Number(menuPriceInput.value) || 0;
+  }
   if (menuTab === "alcohol") {
     data.category = menuCategorySelect.value;
   }
