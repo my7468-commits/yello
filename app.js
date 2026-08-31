@@ -264,6 +264,36 @@ async function submitReservationRemote(data) {
   }
 }
 
+/* ===================================================================
+   客人自助查詢／取消訂位：不需要管理密碼，用訂位編號＋電話比對。
+   =================================================================== */
+
+async function guestLookupReservation(id, phone) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=guestLookupReservation&id=${encodeURIComponent(id)}&phone=${encodeURIComponent(phone)}`;
+    const data = await jsonp(url);
+    if (data && data.result === "success") return { ok: true, reservation: data.reservation };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("查詢訂位失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
+async function guestCancelReservation(id, phone) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=guestCancelReservation&id=${encodeURIComponent(id)}&phone=${encodeURIComponent(phone)}`;
+    const data = await jsonp(url);
+    if (data && data.result === "success") return { ok: true, alreadyCancelled: !!data.alreadyCancelled };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("取消訂位失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
 function showToast(message) {
   let toast = document.querySelector(".toast");
   if (!toast) {

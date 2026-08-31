@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
 <title>訂位 - yELLO VIP EXCLUSIVE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -51,6 +52,10 @@
 
   <div class="panel">
     <form id="bookingForm">
+      <div class="field">
+        <label for="inviteCode">邀請碼 *</label>
+        <input type="text" id="inviteCode" required placeholder="請輸入店家提供的邀請碼" />
+      </div>
       <div class="row-2">
         <div class="field">
           <label for="name">姓名 *</label>
@@ -97,6 +102,23 @@
       <button type="button" class="secondary" id="clearAll">清空紀錄</button>
     </div>
     <div id="reservationList"></div>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin-top:0;">查詢／取消我的訂位</h2>
+    <p style="color:var(--text-muted);font-size:0.9rem;margin-top:-8px;">請輸入訂位成功時取得的「訂位編號」與當時填寫的聯絡電話進行查詢。</p>
+    <div class="row-2">
+      <div class="field">
+        <label for="lookupId">訂位編號</label>
+        <input type="text" id="lookupId" placeholder="例如 R012" />
+      </div>
+      <div class="field">
+        <label for="lookupPhone">聯絡電話</label>
+        <input type="tel" id="lookupPhone" placeholder="0912-345-678" />
+      </div>
+    </div>
+    <button type="button" id="lookupBtn">查詢訂位</button>
+    <div id="lookupResult" style="margin-top:16px;"></div>
   </div>
 
   <div class="toolbar" id="calLoginPanel" style="justify-content:flex-end;">
@@ -242,6 +264,7 @@ function renderList() {
   }
   const rows = items.map((r) => `
     <tr>
+      <td>${escapeHtml(r.id)}</td>
       <td>${escapeHtml(r.name)}</td>
       <td>${escapeHtml(r.phone)}</td>
       <td>${escapeHtml(r.email) || "-"}</td>
@@ -258,7 +281,7 @@ function renderList() {
     <table>
       <thead>
         <tr>
-          <th>姓名</th><th>電話</th><th>Email</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th>
+          <th>訂位編號</th><th>姓名</th><th>電話</th><th>Email</th><th>日期時間</th><th>人數</th><th>預訂餐點</th><th>備註</th><th>狀態</th><th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -287,6 +310,7 @@ form.addEventListener("submit", async (e) => {
   const preOrderItems = getPreOrderItems();
   const data = {
     id: uid("r"),
+    inviteCode: document.getElementById("inviteCode").value.trim(),
     name: document.getElementById("name").value.trim(),
     phone: document.getElementById("phone").value.trim(),
     email: document.getElementById("email").value.trim(),
@@ -304,15 +328,21 @@ form.addEventListener("submit", async (e) => {
   submitBtn.disabled = false;
   submitBtn.textContent = "送出訂位";
 
-  // 時段衝突（同一場地 ±2 小時內已有其他訂位）或缺少 Email：不算成功，
-  // 不寫入本機紀錄、不清空表單，讓客人可以直接修正後再送一次。
+  // 邀請碼錯誤、時段衝突（同一場地 ±2 小時內已有其他訂位）或缺少 Email：
+  // 不算成功，不寫入本機紀錄、不清空表單，讓客人可以直接修正後再送一次。
   const isRejected =
     isWebhookConfigured() &&
     !result.ok &&
-    (result.reasonCode === "conflict" || result.reasonCode === "missing_email");
+    (result.reasonCode === "conflict" || result.reasonCode === "missing_email" || result.reasonCode === "invalid_invite");
   if (isRejected) {
     showToast(result.reason);
     return;
+  }
+
+  // 伺服器會另外產生正式的訂位編號（例如 R012），跟前端暫用的本機 id 不同，
+  // 送出成功的話改用伺服器回傳的編號，這樣客人日後查詢／取消才對得上。
+  if (result.ok && result.id) {
+    data.id = result.id;
   }
 
   Store.addReservation(data);
@@ -322,7 +352,7 @@ form.addEventListener("submit", async (e) => {
   renderList();
 
   if (isWebhookConfigured()) {
-    showToast(result.ok ? "訂位已送出，並同步到 Google 試算表！" : "訂位已存本機，但同步試算表失敗，請確認網路或設定");
+    showToast(result.ok ? `訂位已送出！訂位編號 ${result.id}，請保留以便日後查詢或取消。` : "訂位已存本機，但同步試算表失敗，請確認網路或設定");
   } else {
     showToast("訂位已送出（尚未同步試算表，請先完成設定）");
   }
@@ -335,6 +365,74 @@ renderList();
     renderPreOrderGroup(preOrderFoodEl, remote.food);
   }
 })();
+
+/* ===================================================================
+   客人自助查詢／取消訂位：不需要管理密碼，用訂位編號＋電話比對，
+   查到之後可以直接把狀態改成「已取消」，釋出該時段。
+   =================================================================== */
+
+const lookupBtn = document.getElementById("lookupBtn");
+const lookupResultEl = document.getElementById("lookupResult");
+
+async function doLookup() {
+  const id = document.getElementById("lookupId").value.trim();
+  const phone = document.getElementById("lookupPhone").value.trim();
+  if (!id || !phone) {
+    showToast("請輸入訂位編號與電話");
+    return;
+  }
+  if (!isWebhookConfigured()) {
+    showToast("尚未設定共用試算表連結，無法查詢");
+    return;
+  }
+  lookupBtn.disabled = true;
+  lookupBtn.textContent = "查詢中...";
+  const result = await guestLookupReservation(id, phone);
+  lookupBtn.disabled = false;
+  lookupBtn.textContent = "查詢訂位";
+  if (!result.ok) {
+    lookupResultEl.innerHTML = `<p class="empty-hint">${escapeHtml(result.reason || "查無此訂位")}</p>`;
+    return;
+  }
+  renderLookupResult(result.reservation);
+}
+lookupBtn.addEventListener("click", doLookup);
+
+function renderLookupResult(r) {
+  const canCancel = r.status !== "已取消";
+  lookupResultEl.innerHTML = `
+    <table>
+      <tbody>
+        <tr><th>訂位編號</th><td>${escapeHtml(r.id)}</td></tr>
+        <tr><th>姓名</th><td>${escapeHtml(r.name)}</td></tr>
+        <tr><th>日期時間</th><td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td></tr>
+        <tr><th>人數</th><td>${escapeHtml(r.people)} 位</td></tr>
+        <tr><th>預訂餐點</th><td>${escapeHtml(r.items) || "-"}</td></tr>
+        <tr><th>備註</th><td>${escapeHtml(r.note) || "-"}</td></tr>
+        <tr><th>狀態</th><td><span class="tag">${escapeHtml(r.status)}</span></td></tr>
+      </tbody>
+    </table>
+    ${canCancel ? `<button type="button" class="danger" id="lookupCancelBtn" style="margin-top:12px;">取消此訂位</button>` : `<p class="empty-hint">此訂位已取消</p>`}
+  `;
+  const cancelBtn = document.getElementById("lookupCancelBtn");
+  if (!cancelBtn) return;
+  cancelBtn.addEventListener("click", async () => {
+    if (!confirm("確定要取消這筆訂位嗎？取消後無法復原。")) return;
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = "取消中...";
+    const id = document.getElementById("lookupId").value.trim();
+    const phone = document.getElementById("lookupPhone").value.trim();
+    const result = await guestCancelReservation(id, phone);
+    if (!result.ok) {
+      showToast("取消失敗：" + (result.reason || "請稍後再試"));
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = "取消此訂位";
+      return;
+    }
+    showToast("已取消訂位");
+    renderLookupResult({ ...r, status: "已取消" });
+  });
+}
 
 /* ===================================================================
    管理模式：登入後顯示行事曆，把當月訂位簡要標註在對應日期上，
