@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   reservations: "rb_reservations",
   menuFood: "rb_menu_food",
   menuAlcohol: "rb_menu_alcohol",
+  menuDelivery: "rb_menu_delivery",
 };
 
 // 預設菜單資料（第一次開啟時自動寫入，之後可在「菜單管理模式」中修改）
@@ -24,6 +25,12 @@ const DEFAULT_ALCOHOL = [
   { id: "a1", name: "招牌梅酒 Sour", price: 260, desc: "日本梅酒、氣泡水、檸檬", available: true, category: "調酒" },
   { id: "a2", name: "Old Fashioned", price: 320, desc: "波本威士忌、苦精、橙皮", available: true, category: "調酒" },
   { id: "a3", name: "生啤酒（一杯）", price: 160, desc: "當季精釀，口味依供應調整", available: true, category: "啤酒" },
+];
+
+// 外送點餐推薦店家（沒有價格，desc 放簡介，link 放訂購連結）
+const DEFAULT_DELIVERY = [
+  { id: "d1", name: "推薦店家 A", desc: "巷口熱炒，適合宵夜加點", link: "https://www.ubereats.com/tw", available: true },
+  { id: "d2", name: "推薦店家 B", desc: "日式定食，份量足", link: "https://www.foodpanda.com.tw", available: true },
 ];
 
 function uid(prefix) {
@@ -91,6 +98,19 @@ const Store = {
   saveAlcoholMenu(list) {
     writeList(STORAGE_KEYS.menuAlcohol, list);
   },
+
+  // ---- 菜單：外送推薦 ----
+  getDeliveryMenu() {
+    let list = readList(STORAGE_KEYS.menuDelivery);
+    if (!list) {
+      list = DEFAULT_DELIVERY;
+      writeList(STORAGE_KEYS.menuDelivery, list);
+    }
+    return list;
+  },
+  saveDeliveryMenu(list) {
+    writeList(STORAGE_KEYS.menuDelivery, list);
+  },
 };
 
 /* ===================================================================
@@ -157,6 +177,9 @@ async function fetchRemoteMenu() {
     if (data && Array.isArray(data.food) && Array.isArray(data.alcohol)) {
       Store.saveFoodMenu(data.food);
       Store.saveAlcoholMenu(data.alcohol);
+      if (Array.isArray(data.delivery)) {
+        Store.saveDeliveryMenu(data.delivery);
+      }
       return data;
     }
     return null;
