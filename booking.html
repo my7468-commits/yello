@@ -104,23 +104,6 @@
     <div id="reservationList"></div>
   </div>
 
-  <div class="panel">
-    <h2 style="margin-top:0;">查詢／取消我的訂位</h2>
-    <p style="color:var(--text-muted);font-size:0.9rem;margin-top:-8px;">請輸入訂位成功時取得的「訂位編號」與當時填寫的聯絡電話進行查詢。</p>
-    <div class="row-2">
-      <div class="field">
-        <label for="lookupId">訂位編號</label>
-        <input type="text" id="lookupId" placeholder="例如 R012" />
-      </div>
-      <div class="field">
-        <label for="lookupPhone">聯絡電話</label>
-        <input type="tel" id="lookupPhone" placeholder="0912-345-678" />
-      </div>
-    </div>
-    <button type="button" id="lookupBtn">查詢訂位</button>
-    <div id="lookupResult" style="margin-top:16px;"></div>
-  </div>
-
   <div class="toolbar" id="calLoginPanel" style="justify-content:flex-end;">
     <button type="button" class="secondary" id="calLoginBtn">開啟管理模式</button>
   </div>
@@ -365,74 +348,6 @@ renderList();
     renderPreOrderGroup(preOrderFoodEl, remote.food);
   }
 })();
-
-/* ===================================================================
-   客人自助查詢／取消訂位：不需要管理密碼，用訂位編號＋電話比對，
-   查到之後可以直接把狀態改成「已取消」，釋出該時段。
-   =================================================================== */
-
-const lookupBtn = document.getElementById("lookupBtn");
-const lookupResultEl = document.getElementById("lookupResult");
-
-async function doLookup() {
-  const id = document.getElementById("lookupId").value.trim();
-  const phone = document.getElementById("lookupPhone").value.trim();
-  if (!id || !phone) {
-    showToast("請輸入訂位編號與電話");
-    return;
-  }
-  if (!isWebhookConfigured()) {
-    showToast("尚未設定共用試算表連結，無法查詢");
-    return;
-  }
-  lookupBtn.disabled = true;
-  lookupBtn.textContent = "查詢中...";
-  const result = await guestLookupReservation(id, phone);
-  lookupBtn.disabled = false;
-  lookupBtn.textContent = "查詢訂位";
-  if (!result.ok) {
-    lookupResultEl.innerHTML = `<p class="empty-hint">${escapeHtml(result.reason || "查無此訂位")}</p>`;
-    return;
-  }
-  renderLookupResult(result.reservation);
-}
-lookupBtn.addEventListener("click", doLookup);
-
-function renderLookupResult(r) {
-  const canCancel = r.status !== "已取消";
-  lookupResultEl.innerHTML = `
-    <table>
-      <tbody>
-        <tr><th>訂位編號</th><td>${escapeHtml(r.id)}</td></tr>
-        <tr><th>姓名</th><td>${escapeHtml(r.name)}</td></tr>
-        <tr><th>日期時間</th><td>${escapeHtml(r.date)} ${escapeHtml(r.time)}</td></tr>
-        <tr><th>人數</th><td>${escapeHtml(r.people)} 位</td></tr>
-        <tr><th>預訂餐點</th><td>${escapeHtml(r.items) || "-"}</td></tr>
-        <tr><th>備註</th><td>${escapeHtml(r.note) || "-"}</td></tr>
-        <tr><th>狀態</th><td><span class="tag">${escapeHtml(r.status)}</span></td></tr>
-      </tbody>
-    </table>
-    ${canCancel ? `<button type="button" class="danger" id="lookupCancelBtn" style="margin-top:12px;">取消此訂位</button>` : `<p class="empty-hint">此訂位已取消</p>`}
-  `;
-  const cancelBtn = document.getElementById("lookupCancelBtn");
-  if (!cancelBtn) return;
-  cancelBtn.addEventListener("click", async () => {
-    if (!confirm("確定要取消這筆訂位嗎？取消後無法復原。")) return;
-    cancelBtn.disabled = true;
-    cancelBtn.textContent = "取消中...";
-    const id = document.getElementById("lookupId").value.trim();
-    const phone = document.getElementById("lookupPhone").value.trim();
-    const result = await guestCancelReservation(id, phone);
-    if (!result.ok) {
-      showToast("取消失敗：" + (result.reason || "請稍後再試"));
-      cancelBtn.disabled = false;
-      cancelBtn.textContent = "取消此訂位";
-      return;
-    }
-    showToast("已取消訂位");
-    renderLookupResult({ ...r, status: "已取消" });
-  });
-}
 
 /* ===================================================================
    管理模式：登入後顯示行事曆，把當月訂位簡要標註在對應日期上，
