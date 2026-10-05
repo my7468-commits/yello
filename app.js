@@ -264,6 +264,48 @@ async function submitReservationRemote(data) {
   }
 }
 
+/* ===================================================================
+   酒譜（私人調酒參考）：全部需要管理密碼。
+   =================================================================== */
+
+async function fetchRemoteRecipes(password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const data = await jsonp(`${WEBHOOK_URL}?action=getRecipes&password=${encodeURIComponent(password)}`);
+    if (data && Array.isArray(data.recipes)) return { ok: true, recipes: data.recipes };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("讀取酒譜失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
+async function saveRemoteRecipe(item, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=saveRecipe&password=${encodeURIComponent(password)}&item=${encodeURIComponent(JSON.stringify(item))}`;
+    const data = await jsonp(url);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("儲存酒譜失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
+async function deleteRemoteRecipe(id, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=deleteRecipe&password=${encodeURIComponent(password)}&id=${encodeURIComponent(id)}`;
+    const data = await jsonp(url);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("刪除酒譜失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
 function showToast(message) {
   let toast = document.querySelector(".toast");
   if (!toast) {
