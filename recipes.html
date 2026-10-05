@@ -351,6 +351,7 @@ function renderDetail() {
     ${r.notes ? `<div class="mix-section-title">備註</div><div style="font-size:1rem;color:var(--text-muted);">${escapeHtml(r.notes)}</div>` : ""}
 
     <div class="mix-actions">
+      <button type="button" id="addToMenuBtn">加入酒單</button>
       <button type="button" class="secondary" id="editBtn">編輯</button>
       <button type="button" class="danger" id="deleteBtn">刪除</button>
     </div>
@@ -372,8 +373,33 @@ function renderDetail() {
       renderDetail();
     });
   });
+  document.getElementById("addToMenuBtn").addEventListener("click", () => addRecipeToMenu(r));
   document.getElementById("editBtn").addEventListener("click", () => openEdit(r.id));
   document.getElementById("deleteBtn").addEventListener("click", () => deleteRecipe(r.id));
+}
+
+/* ---------- 加入酒單（公開菜單頁的「酒單」） ---------- */
+async function addRecipeToMenu(r) {
+  const btn = document.getElementById("addToMenuBtn");
+  btn.disabled = true;
+  btn.textContent = "處理中...";
+  try {
+    const remote = await fetchRemoteMenu();
+    if (!remote) { showToast("讀取酒單失敗，請稍後再試"); return; }
+    const list = remote.alcohol || [];
+    if (list.some((i) => i.name === r.name)) {
+      showToast("酒單裡已經有「" + r.name + "」");
+      return;
+    }
+    const desc = (r.ingredients || []).map((i) => i.name).join("、");
+    const item = { id: uid("m"), name: r.name, price: 0, desc, available: true, category: "調酒" };
+    const result = await saveRemoteMenu("alcohol", [...list, item], password);
+    if (result.ok) showToast("已加入酒單（分類：調酒）");
+    else showToast("加入失敗：" + (result.reason || "請稍後再試"));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "加入酒單";
+  }
 }
 
 /* ---------- 新增／編輯／刪除 ---------- */
