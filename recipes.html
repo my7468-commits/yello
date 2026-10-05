@@ -65,6 +65,7 @@
       <select id="baseFilter"></select>
       <button type="button" id="addBtn">＋ 新增酒譜</button>
       <button type="button" class="secondary" id="refreshBtn">重新整理</button>
+      <button type="button" class="secondary" id="importBtn" style="display:none;">匯入經典酒譜</button>
     </div>
     <div id="recipeList" class="recipe-grid"></div>
   </div>
@@ -130,6 +131,34 @@ document.getElementById("year").textContent = new Date().getFullYear();
 
 const BASES = ["威士忌", "琴酒", "伏特加", "蘭姆酒", "龍舌蘭", "白蘭地", "其它"];
 const METHODS = ["搖盪", "攪拌", "直調", "其它"];
+
+// 預設經典酒譜：清單上若還沒有，會出現「匯入經典酒譜」按鈕，一鍵補上（已存在的不會覆寫）
+const EXTRA_RECIPES = [
+  { id: "rc6", name: "內格羅尼 Negroni", base: "琴酒", glass: "古典杯（加大冰塊）", method: "攪拌",
+    ingredients: [{ name: "琴酒", amount: 30, unit: "ml" }, { name: "金巴利", amount: 30, unit: "ml" }, { name: "甜苦艾酒", amount: 30, unit: "ml" }],
+    steps: "所有材料加冰攪拌約 20 秒\n濾入裝有大冰塊的古典杯\n擠入橙皮油", garnish: "橙皮", notes: "三種材料等比例 1:1:1，好記好調。", image: "" },
+  { id: "rc7", name: "瑪格麗特 Margarita", base: "龍舌蘭", glass: "瑪格麗特杯（或古典杯）", method: "搖盪",
+    ingredients: [{ name: "白龍舌蘭", amount: 50, unit: "ml" }, { name: "君度橙酒", amount: 20, unit: "ml" }, { name: "萊姆汁", amount: 15, unit: "ml" }],
+    steps: "（選用）杯口抹上萊姆汁，沾一圈鹽\n所有材料加冰用力搖盪\n濾入杯中", garnish: "萊姆片", notes: "鹽邊為選用。", image: "" },
+  { id: "rc8", name: "威士忌酸 Whisky Sour", base: "威士忌", glass: "古典杯（加冰塊）", method: "搖盪",
+    ingredients: [{ name: "波本威士忌", amount: 50, unit: "ml" }, { name: "檸檬汁", amount: 25, unit: "ml" }, { name: "糖漿", amount: 15, unit: "ml" }],
+    steps: "所有材料加冰用力搖盪\n濾入裝有冰塊的古典杯", garnish: "櫻桃、橙片", notes: "想要綿密泡沫可加蛋白約 15ml，先不加冰乾搖一次再加冰搖（選用）。", image: "" },
+  { id: "rc9", name: "莫希托 Mojito", base: "蘭姆酒", glass: "高球杯", method: "直調",
+    ingredients: [{ name: "白蘭姆酒", amount: 45, unit: "ml" }, { name: "萊姆汁", amount: 25, unit: "ml" }, { name: "糖漿", amount: 15, unit: "ml" }, { name: "薄荷葉", amount: 8, unit: "片" }, { name: "蘇打水", amount: null, unit: "補滿" }],
+    steps: "杯中放入薄荷葉、糖漿與萊姆汁，輕壓出香氣（不要壓爛）\n加入蘭姆酒與碎冰攪拌\n補滿蘇打水，輕輕攪拌", garnish: "薄荷枝", notes: "", image: "" },
+  { id: "rc10", name: "莫斯科騾子 Moscow Mule", base: "伏特加", glass: "銅杯（或高球杯）", method: "直調",
+    ingredients: [{ name: "伏特加", amount: 45, unit: "ml" }, { name: "萊姆汁", amount: 15, unit: "ml" }, { name: "薑汁啤酒", amount: 120, unit: "ml" }],
+    steps: "杯中裝滿冰塊\n倒入伏特加與萊姆汁\n補上薑汁啤酒，輕輕攪拌", garnish: "萊姆片、薄荷", notes: "薑汁啤酒（ginger beer）與薑汁汽水（ginger ale）不同，前者薑味更辛辣。", image: "" },
+  { id: "rc11", name: "湯姆可林 Tom Collins", base: "琴酒", glass: "高球杯（柯林斯杯）", method: "搖盪",
+    ingredients: [{ name: "琴酒", amount: 45, unit: "ml" }, { name: "檸檬汁", amount: 25, unit: "ml" }, { name: "糖漿", amount: 15, unit: "ml" }, { name: "蘇打水", amount: null, unit: "補滿" }],
+    steps: "琴酒、檸檬汁、糖漿加冰搖盪\n濾入裝滿冰塊的高球杯\n補滿蘇打水，輕輕攪拌", garnish: "檸檬片、櫻桃", notes: "", image: "" },
+  { id: "rc12", name: "馬丁尼 Martini", base: "琴酒", glass: "馬天尼杯（先冰杯）", method: "攪拌",
+    ingredients: [{ name: "琴酒", amount: 60, unit: "ml" }, { name: "不甜苦艾酒", amount: 10, unit: "ml" }],
+    steps: "材料加冰攪拌約 30 秒\n濾入預先冰過的杯中\n（選用檸檬皮時）擠入檸檬皮油", garnish: "橄欖或檸檬皮", notes: "苦艾酒比例依個人口味調整，越少越「Dry」。", image: "" },
+  { id: "rc13", name: "蜜蜂的膝蓋 Bee's Knees", base: "琴酒", glass: "馬天尼杯（先冰杯）", method: "搖盪",
+    ingredients: [{ name: "琴酒", amount: 50, unit: "ml" }, { name: "檸檬汁", amount: 20, unit: "ml" }, { name: "蜂蜜糖漿", amount: 15, unit: "ml" }],
+    steps: "所有材料加冰用力搖盪\n雙重過濾入預先冰過的杯中\n擠入檸檬皮油", garnish: "檸檬皮", notes: "蜂蜜糖漿：蜂蜜與熱水 1:1 攪拌溶解後放涼。", image: "" }
+];
 
 const loginPanel = document.getElementById("loginPanel");
 const listPanel = document.getElementById("listPanel");
@@ -203,8 +232,37 @@ document.getElementById("refreshBtn").addEventListener("click", async () => {
 });
 
 /* ---------- 清單 ---------- */
+function updateImportBtn() {
+  const missing = EXTRA_RECIPES.filter((x) => !recipes.some((r) => r.id === x.id));
+  const btn = document.getElementById("importBtn");
+  btn.style.display = missing.length ? "inline-block" : "none";
+  btn.textContent = `匯入經典酒譜（${missing.length} 道）`;
+}
+
+document.getElementById("importBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("importBtn");
+  const missing = EXTRA_RECIPES.filter((x) => !recipes.some((r) => r.id === x.id));
+  if (!missing.length) return;
+  btn.disabled = true;
+  let done = 0;
+  for (const item of missing) {
+    btn.textContent = `匯入中 ${done + 1}/${missing.length}...`;
+    const result = await saveRemoteRecipe(item, password);
+    if (!result.ok) {
+      showToast("匯入失敗：" + (result.reason || "請稍後再試"));
+      break;
+    }
+    recipes = [...recipes, item];
+    done++;
+  }
+  btn.disabled = false;
+  renderList();
+  if (done) showToast(`已匯入 ${done} 道酒譜`);
+});
+
 function renderList() {
-  const q = searchInput.value.trim().toLowerCase();
+  updateImportBtn();
+  const q =searchInput.value.trim().toLowerCase();
   const base = baseFilter.value;
   const items = recipes.filter((r) => {
     if (base && r.base !== base) return false;
