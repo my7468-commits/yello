@@ -13,6 +13,8 @@
 .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
 .recipe-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; background: #fff; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
 .recipe-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+.recipe-card .thumb { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; margin-bottom: 10px; display: block; background: #f2e9de; }
+.mix-photo { width: 100%; max-height: 300px; object-fit: cover; border-radius: var(--radius); margin: 14px 0 4px; display: block; }
 .recipe-card h3 { margin: 0 0 6px; font-size: 1.1rem; }
 .recipe-card .meta { color: var(--text-muted); font-size: 0.85rem; }
 .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -104,6 +106,10 @@
       <div class="field">
         <label for="fGarnish">裝飾</label>
         <input type="text" id="fGarnish" />
+      </div>
+      <div class="field">
+        <label for="fImage">成品圖片（填圖片檔名，或完整圖片網址）</label>
+        <input type="text" id="fImage" placeholder="例如：manhattan.jpg" />
       </div>
       <div class="field">
         <label for="fNotes">備註</label>
@@ -212,6 +218,7 @@ function renderList() {
   }
   listEl.innerHTML = items.map((r) => `
     <div class="recipe-card" data-id="${escapeHtml(r.id)}">
+      ${r.image ? `<img class="thumb" src="${escapeHtml(r.image)}" alt="" loading="lazy" onerror="this.remove()" />` : ""}
       <h3>${escapeHtml(r.name)}</h3>
       <div class="meta">${escapeHtml(r.base || "-")}・${escapeHtml(r.method || "-")}</div>
       <div class="meta">${escapeHtml(r.glass || "")}</div>
@@ -261,6 +268,7 @@ function renderDetail() {
     <button type="button" class="secondary" id="backBtn">‹ 返回清單</button>
     <h2 class="mix-title" style="margin-top:16px;">${escapeHtml(r.name)}</h2>
     <div class="mix-meta">${escapeHtml(r.base || "")}・${escapeHtml(r.method || "")}・${escapeHtml(r.glass || "")}</div>
+    ${r.image ? `<img class="mix-photo" src="${escapeHtml(r.image)}" alt="${escapeHtml(r.name)}" onerror="this.remove()" />` : ""}
 
     <div class="servings-box">
       <span>杯數</span>
@@ -345,6 +353,7 @@ function openEdit(id) {
   document.getElementById("fSteps").value = r ? r.steps : "";
   document.getElementById("fGarnish").value = r ? r.garnish : "";
   document.getElementById("fNotes").value = r ? r.notes : "";
+  document.getElementById("fImage").value = r ? r.image || "" : "";
   listPanel.style.display = "none";
   detailPanel.style.display = "none";
   editPanel.style.display = "block";
@@ -380,6 +389,7 @@ document.getElementById("recipeForm").addEventListener("submit", async (e) => {
     steps: document.getElementById("fSteps").value.trim(),
     garnish: document.getElementById("fGarnish").value.trim(),
     notes: document.getElementById("fNotes").value.trim(),
+    image: document.getElementById("fImage").value.trim(),
   };
   saveBtn.disabled = true;
   saveBtn.textContent = "儲存中...";
