@@ -22,6 +22,7 @@
 .filter-bar input { flex: 1; min-width: 160px; }
 
 /* 調酒模式：大字體、好點選，適合邊調邊看 */
+.mix-meta, .recipe-card .meta { white-space: pre-line; }
 .mix-title { font-size: 1.8rem; margin: 0 0 4px; }
 .mix-meta { color: var(--text-muted); margin-bottom: 18px; }
 .servings-box { display: flex; align-items: center; gap: 10px; margin: 14px 0 18px; font-size: 1.1rem; }
@@ -94,7 +95,7 @@
       </div>
       <div class="field">
         <label for="fGlass">杯型</label>
-        <input type="text" id="fGlass" placeholder="例如：古典杯（加大冰塊）" />
+        <textarea id="fGlass" rows="2" placeholder="例如：古典杯（加大冰塊）"></textarea>
       </div>
       <div class="field">
         <label for="fIngredients">材料（一行一項，格式：名稱 | 數量 | 單位）</label>
@@ -106,7 +107,7 @@
       </div>
       <div class="field">
         <label for="fGarnish">裝飾</label>
-        <input type="text" id="fGarnish" />
+        <textarea id="fGarnish" rows="2"></textarea>
       </div>
       <div class="field">
         <label for="fImage">成品圖片（填圖片檔名，或完整圖片網址）</label>
@@ -347,8 +348,8 @@ function renderDetail() {
     </div>
 
     ${steps.length ? `<div class="mix-section-title">步驟</div><ol class="mix-steps">${steps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ol>` : ""}
-    ${r.garnish ? `<div class="mix-section-title">裝飾</div><div style="font-size:1.15rem;">${escapeHtml(r.garnish)}</div>` : ""}
-    ${r.notes ? `<div class="mix-section-title">備註</div><div style="font-size:1rem;color:var(--text-muted);">${escapeHtml(r.notes)}</div>` : ""}
+    ${r.garnish ? `<div class="mix-section-title">裝飾</div><div style="font-size:1.15rem;white-space:pre-line;">${escapeHtml(r.garnish)}</div>` : ""}
+    ${r.notes ? `<div class="mix-section-title">備註</div><div style="font-size:1rem;color:var(--text-muted);white-space:pre-line;">${escapeHtml(r.notes)}</div>` : ""}
 
     <div class="mix-actions">
       <button type="button" id="addToMenuBtn">加入酒單</button>
@@ -456,6 +457,19 @@ function openEdit(id) {
 }
 
 document.getElementById("addBtn").addEventListener("click", () => openEdit(null));
+
+// 多行欄位：明確處理 Enter，在游標位置插入換行（輸入法組字中除外，讓 Enter 先用來確認文字）
+document.querySelectorAll("#recipeForm textarea").forEach((ta) => {
+  ta.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + "\n" + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + 1;
+  });
+});
 
 function closeEdit() {
   editPanel.style.display = "none";
