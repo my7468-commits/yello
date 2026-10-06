@@ -193,7 +193,9 @@ async function saveRemoteMenu(category, items, password) {
   if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
   try {
     const url = `${WEBHOOK_URL}?action=saveMenu&category=${encodeURIComponent(category)}&password=${encodeURIComponent(password)}&items=${encodeURIComponent(JSON.stringify(items))}`;
-    const data = await jsonp(url);
+    // 後端是逐列寫入試算表，品項多時會比較久，逾時放寬到 45 秒，
+    // 避免「其實已寫入成功，但前端等不及就判定失敗」。
+    const data = await jsonp(url, 45000);
     if (data && data.result === "success") return { ok: true };
     return { ok: false, reason: data && data.message ? data.message : "unknown" };
   } catch (err) {

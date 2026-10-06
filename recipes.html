@@ -394,8 +394,19 @@ async function addRecipeToMenu(r) {
     const desc = (r.ingredients || []).map((i) => i.name).join("、");
     const item = { id: uid("m"), name: r.name, price: 0, desc, available: true, category: "調酒" };
     const result = await saveRemoteMenu("alcohol", [...list, item], password);
-    if (result.ok) showToast("已加入酒單（分類：調酒）");
-    else showToast("加入失敗：" + (result.reason || "請稍後再試"));
+    if (result.ok) {
+      showToast("已加入酒單（分類：調酒）");
+    } else if (result.reason === "network") {
+      // 回應逾時不代表寫入失敗，重新讀一次酒單確認是否其實已經加入成功
+      const check = await fetchRemoteMenu();
+      if (check && (check.alcohol || []).some((i) => i.id === item.id || i.name === r.name)) {
+        showToast("已加入酒單（分類：調酒）");
+      } else {
+        showToast("加入失敗：連線逾時，請稍後再試");
+      }
+    } else {
+      showToast("加入失敗：" + (result.reason || "請稍後再試"));
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = "加入酒單";
