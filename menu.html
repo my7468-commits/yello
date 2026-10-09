@@ -141,17 +141,17 @@ function saveCurrentMenu(list) {
   else Store.saveDeliveryMenu(list);
 }
 
-async function persistMenuChange(list) {
+async function persistMenuChange(list, op) {
   saveCurrentMenu(list);
   renderMenu();
   if (!isWebhookConfigured()) return;
-  const result = await saveRemoteMenu(currentTab, list, adminPassword);
+  const result = await syncMenuChange(currentTab, list, op, adminPassword);
   if (result.ok) {
     showToast("已同步到共用菜單");
   } else if (result.reason === "密碼錯誤") {
     showToast("同步失敗：管理密碼錯誤");
   } else {
-    showToast("本機已更新，但同步共用菜單失敗，請確認網路連線");
+    showToast("本機已更新，但同步共用菜單失敗（" + (result.reason || "未知原因") + "）");
   }
 }
 
@@ -224,7 +224,7 @@ window.editItem = editItem;
 async function deleteItem(id) {
   if (!confirm("確定要刪除此品項嗎？")) return;
   const list = getCurrentMenu().filter((i) => i.id !== id);
-  await persistMenuChange(list);
+  await persistMenuChange(list, { type: "delete", id });
 }
 window.deleteItem = deleteItem;
 
@@ -261,13 +261,19 @@ form.addEventListener("submit", async (e) => {
     data.category = categorySelect.value;
   }
   let list = getCurrentMenu();
+  let savedItem;
   if (id) {
-    list = list.map((i) => (i.id === id ? { ...i, ...data } : i));
+    list = list.map((i) => {
+      if (i.id !== id) return i;
+      savedItem = { ...i, ...data };
+      return savedItem;
+    });
   } else {
-    list = [...list, { id: uid("m"), ...data }];
+    savedItem = { id: uid("m"), ...data };
+    list = [...list, savedItem];
   }
   resetForm();
-  await persistMenuChange(list);
+  await persistMenuChange(list, { type: "save", item: savedItem });
 });
 
 document.getElementById("cancelEdit").addEventListener("click", () => {

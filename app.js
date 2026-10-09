@@ -204,6 +204,49 @@ async function saveRemoteMenu(category, items, password) {
   }
 }
 
+/* ---------------------------------------------------------------------
+   單筆品項儲存：整份菜單用 GET 網址送出時，品項一多網址就會超過長度上限
+   （中文每個字會變成 9 個字元），導致「同步失敗」。所以改成一次只送一筆
+   （新增／修改／刪除）。如果後端還是舊版（不認得新動作），會自動退回
+   舊的整份覆寫方式，不會壞掉。
+   --------------------------------------------------------------------- */
+async function saveRemoteMenuItem(category, item, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=saveMenuItem&category=${encodeURIComponent(category)}&password=${encodeURIComponent(password)}&item=${encodeURIComponent(JSON.stringify(item))}`;
+    const data = await jsonp(url, 45000);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("寫入單筆菜單失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
+async function deleteRemoteMenuItem(category, id, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  try {
+    const url = `${WEBHOOK_URL}?action=deleteMenuItem&category=${encodeURIComponent(category)}&password=${encodeURIComponent(password)}&id=${encodeURIComponent(id)}`;
+    const data = await jsonp(url, 45000);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  } catch (err) {
+    console.error("刪除單筆菜單失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
+// op: { type: "save", item } 或 { type: "delete", id }；list 是變更後的完整清單（舊版後端備援用）
+async function syncMenuChange(category, list, op, password) {
+  if (op) {
+    const r = op.type === "delete"
+      ? await deleteRemoteMenuItem(category, op.id, password)
+      : await saveRemoteMenuItem(category, op.item, password);
+    if (r.ok || r.reason !== "unknown action") return r;
+  }
+  return saveRemoteMenu(category, list, password);
+}
+
 /* ===================================================================
    訂位管理同步：供 admin.html 讀取所有訂位、更新狀態使用。
    =================================================================== */

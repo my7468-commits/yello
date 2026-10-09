@@ -397,7 +397,7 @@ async function addRecipeToMenu(r) {
     }
     const desc = (r.ingredients || []).map((i) => i.name).join("、");
     const item = { id: uid("m"), name: r.name, price: 0, desc, available: true, category: "調酒" };
-    const result = await saveRemoteMenu("alcohol", [...list, item], password);
+    const result = await syncMenuChange("alcohol", [...list, item], { type: "save", item }, password);
     if (result.ok) {
       showToast("已加入酒單（分類：調酒）");
     } else if (result.reason === "network") {

@@ -310,16 +310,16 @@ function renderAdminMenu() {
   `).join("");
 }
 
-async function persistAdminMenuChange(list) {
+async function persistAdminMenuChange(list, op) {
   setCurrentAdminMenu(list);
   renderAdminMenu();
-  const result = await saveRemoteMenu(menuTab, list, adminPassword);
+  const result = await syncMenuChange(menuTab, list, op, adminPassword);
   if (result.ok) {
     showToast("已同步到共用菜單");
   } else if (result.reason === "密碼錯誤") {
     showToast("同步失敗：管理密碼錯誤");
   } else {
-    showToast("本機已更新，但同步共用菜單失敗，請確認網路連線");
+    showToast("本機已更新，但同步共用菜單失敗（" + (result.reason || "未知原因") + "）");
   }
 }
 
@@ -347,7 +347,7 @@ window.editMenuItem = editMenuItem;
 async function deleteMenuItem(id) {
   if (!confirm("確定要刪除此品項嗎？")) return;
   const list = getCurrentAdminMenu().filter((i) => i.id !== id);
-  await persistAdminMenuChange(list);
+  await persistAdminMenuChange(list, { type: "delete", id });
 }
 window.deleteMenuItem = deleteMenuItem;
 
@@ -383,13 +383,19 @@ menuItemForm.addEventListener("submit", async (e) => {
     data.category = menuCategorySelect.value;
   }
   let list = getCurrentAdminMenu();
+  let savedItem;
   if (id) {
-    list = list.map((i) => (i.id === id ? { ...i, ...data } : i));
+    list = list.map((i) => {
+      if (i.id !== id) return i;
+      savedItem = { ...i, ...data };
+      return savedItem;
+    });
   } else {
-    list = [...list, { id: uid("m"), ...data }];
+    savedItem = { id: uid("m"), ...data };
+    list = [...list, savedItem];
   }
   resetMenuForm();
-  await persistAdminMenuChange(list);
+  await persistAdminMenuChange(list, { type: "save", item: savedItem });
 });
 
 document.getElementById("menuCancelEdit").addEventListener("click", resetMenuForm);
