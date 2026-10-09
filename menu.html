@@ -108,6 +108,8 @@
 document.getElementById("year").textContent = new Date().getFullYear();
 
 let currentTab = "food";
+const ALCOHOL_PAGE_SIZE = 15; // 酒單每頁顯示的品項數
+let alcoholPage = 1;
 let adminMode = false;
 let adminPassword = "";
 
@@ -184,20 +186,49 @@ function renderMenu() {
     return;
   }
 
-  // 酒單依分類分組顯示（沒有分類或分類不在清單中的，一律歸到「其它」）
-  const groups = ALCOHOL_CATEGORIES.map((cat) => ({
-    name: cat,
-    items: items.filter((i) => {
+  // 酒單依分類分組（沒有分類或分類不在清單中的，一律歸到「其它」），
+  // 再依分類順序攤平成一長串，每 ALCOHOL_PAGE_SIZE 個品項為一頁。
+  const ordered = [];
+  ALCOHOL_CATEGORIES.forEach((cat) => {
+    items.forEach((i) => {
       const itemCat = ALCOHOL_CATEGORIES.includes(i.category) ? i.category : "其它";
-      return itemCat === cat;
-    }),
-  })).filter((g) => g.items.length > 0);
+      if (itemCat === cat) ordered.push({ cat, item: i });
+    });
+  });
 
-  menuListEl.innerHTML = groups.map((g) => `
-    <h3 style="margin:20px 0 4px;color:var(--accent-dark);">${escapeHtml(g.name)}</h3>
-    ${g.items.map(renderMenuItem).join("")}
-  `).join("");
+  const totalPages = Math.max(1, Math.ceil(ordered.length / ALCOHOL_PAGE_SIZE));
+  if (alcoholPage > totalPages) alcoholPage = totalPages;
+  if (alcoholPage < 1) alcoholPage = 1;
+  const slice = ordered.slice((alcoholPage - 1) * ALCOHOL_PAGE_SIZE, alcoholPage * ALCOHOL_PAGE_SIZE);
+
+  // 這一頁內的品項，仍依分類加上小標題
+  let html = "";
+  let lastCat = null;
+  slice.forEach(({ cat, item }) => {
+    if (cat !== lastCat) {
+      html += `<h3 style="margin:20px 0 4px;color:var(--accent-dark);">${escapeHtml(cat)}</h3>`;
+      lastCat = cat;
+    }
+    html += renderMenuItem(item);
+  });
+
+  if (totalPages > 1) {
+    html += `
+      <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-top:20px;">
+        <button type="button" class="secondary" ${alcoholPage <= 1 ? "disabled" : ""} onclick="goAlcoholPage(${alcoholPage - 1})">‹ 上一頁</button>
+        <span style="color:var(--text-muted);">第 ${alcoholPage} / ${totalPages} 頁</span>
+        <button type="button" class="secondary" ${alcoholPage >= totalPages ? "disabled" : ""} onclick="goAlcoholPage(${alcoholPage + 1})">下一頁 ›</button>
+      </div>`;
+  }
+  menuListEl.innerHTML = html;
 }
+
+function goAlcoholPage(n) {
+  alcoholPage = n;
+  renderMenu();
+  menuListEl.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+window.goAlcoholPage = goAlcoholPage;
 
 function editItem(id) {
   const item = getCurrentMenu().find((i) => i.id === id);
@@ -303,6 +334,7 @@ tabs.forEach((btn) => {
     tabs.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     currentTab = btn.dataset.tab;
+    alcoholPage = 1;
     resetForm();
     renderMenu();
   });
