@@ -9,6 +9,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;700&family=Yuji+Syuku&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
+<style>
+.cat-pager { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.cat-pager button { background: transparent; color: var(--accent-dark); border: 1px solid var(--accent); padding: 8px 16px; border-radius: 999px; font-size: 0.92rem; }
+.cat-pager button:hover { background: #f2e9de; }
+.cat-pager button.active { background: var(--accent); color: #fff; }
+</style>
 </head>
 <body class="with-bg-carousel">
 
@@ -108,8 +114,7 @@
 document.getElementById("year").textContent = new Date().getFullYear();
 
 let currentTab = "food";
-const ALCOHOL_PAGE_SIZE = 15; // 酒單每頁顯示的品項數
-let alcoholPage = 1;
+let alcoholCategory = null; // 酒單目前顯示的類別（每個類別一頁）
 let adminMode = false;
 let adminPassword = "";
 
@@ -186,49 +191,33 @@ function renderMenu() {
     return;
   }
 
-  // 酒單依分類分組（沒有分類或分類不在清單中的，一律歸到「其它」），
-  // 再依分類順序攤平成一長串，每 ALCOHOL_PAGE_SIZE 個品項為一頁。
-  const ordered = [];
-  ALCOHOL_CATEGORIES.forEach((cat) => {
-    items.forEach((i) => {
-      const itemCat = ALCOHOL_CATEGORIES.includes(i.category) ? i.category : "其它";
-      if (itemCat === cat) ordered.push({ cat, item: i });
-    });
+  // 酒單以「類別」分頁：每個類別一頁（沒有分類或分類不在清單中的，一律歸到「其它」），
+  // 只列出有品項的類別，上方用分頁按鈕切換。
+  const byCat = {};
+  ALCOHOL_CATEGORIES.forEach((cat) => (byCat[cat] = []));
+  items.forEach((i) => {
+    const itemCat = ALCOHOL_CATEGORIES.includes(i.category) ? i.category : "其它";
+    byCat[itemCat].push(i);
   });
+  const cats = ALCOHOL_CATEGORIES.filter((cat) => byCat[cat].length > 0);
+  if (!cats.includes(alcoholCategory)) alcoholCategory = cats[0];
 
-  const totalPages = Math.max(1, Math.ceil(ordered.length / ALCOHOL_PAGE_SIZE));
-  if (alcoholPage > totalPages) alcoholPage = totalPages;
-  if (alcoholPage < 1) alcoholPage = 1;
-  const slice = ordered.slice((alcoholPage - 1) * ALCOHOL_PAGE_SIZE, alcoholPage * ALCOHOL_PAGE_SIZE);
+  const pager = `
+    <div class="cat-pager">
+      ${cats.map((cat) => `
+        <button type="button" class="${cat === alcoholCategory ? "active" : ""}" onclick="goAlcoholCategory('${cat}')">
+          ${escapeHtml(cat)}（${byCat[cat].length}）
+        </button>`).join("")}
+    </div>`;
 
-  // 這一頁內的品項，仍依分類加上小標題
-  let html = "";
-  let lastCat = null;
-  slice.forEach(({ cat, item }) => {
-    if (cat !== lastCat) {
-      html += `<h3 style="margin:20px 0 4px;color:var(--accent-dark);">${escapeHtml(cat)}</h3>`;
-      lastCat = cat;
-    }
-    html += renderMenuItem(item);
-  });
-
-  if (totalPages > 1) {
-    html += `
-      <div style="display:flex;justify-content:center;align-items:center;gap:14px;margin-top:20px;">
-        <button type="button" class="secondary" ${alcoholPage <= 1 ? "disabled" : ""} onclick="goAlcoholPage(${alcoholPage - 1})">‹ 上一頁</button>
-        <span style="color:var(--text-muted);">第 ${alcoholPage} / ${totalPages} 頁</span>
-        <button type="button" class="secondary" ${alcoholPage >= totalPages ? "disabled" : ""} onclick="goAlcoholPage(${alcoholPage + 1})">下一頁 ›</button>
-      </div>`;
-  }
-  menuListEl.innerHTML = html;
+  menuListEl.innerHTML = pager + byCat[alcoholCategory].map(renderMenuItem).join("");
 }
 
-function goAlcoholPage(n) {
-  alcoholPage = n;
+function goAlcoholCategory(cat) {
+  alcoholCategory = cat;
   renderMenu();
-  menuListEl.scrollIntoView({ behavior: "smooth", block: "start" });
 }
-window.goAlcoholPage = goAlcoholPage;
+window.goAlcoholCategory = goAlcoholCategory;
 
 function editItem(id) {
   const item = getCurrentMenu().find((i) => i.id === id);
@@ -334,7 +323,6 @@ tabs.forEach((btn) => {
     tabs.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     currentTab = btn.dataset.tab;
-    alcoholPage = 1;
     resetForm();
     renderMenu();
   });
