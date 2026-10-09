@@ -247,12 +247,16 @@ body.with-bg-carousel main > h1 {
 }
 
 body.with-bg-carousel .hero {
-  background: rgba(255,255,255,0.64);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  background: transparent;
   padding: 32px 20px;
   max-width: 640px;
   margin: 0 auto;
+}
+
+body.with-bg-carousel .hero h1,
+body.with-bg-carousel .hero p {
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.55);
 }
 
 body.with-bg-carousel .tabs {
