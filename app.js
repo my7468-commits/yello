@@ -338,6 +338,29 @@ async function saveRemoteRecipe(item, password) {
   }
 }
 
+// 上傳酒譜圖片：圖片（已縮小的 data URL，約 4 萬字元以內）切成小段，用 GET 分段送到後端，
+// 最後一段送出時後端才會組合並寫入試算表。必須先儲存酒譜（後端要找得到該 id）。
+async function uploadRecipeImage(id, dataUrl, password) {
+  if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
+  const SIZE = 4500;
+  const total = Math.ceil(dataUrl.length / SIZE);
+  const send = async (idx) => {
+    const url = `${WEBHOOK_URL}?action=uploadRecipeImage&password=${encodeURIComponent(password)}&id=${encodeURIComponent(id)}&idx=${idx}&total=${total}&data=${encodeURIComponent(dataUrl.slice(idx * SIZE, (idx + 1) * SIZE))}`;
+    const data = await jsonp(url, 45000);
+    if (data && data.result === "success") return { ok: true };
+    return { ok: false, reason: data && data.message ? data.message : "unknown" };
+  };
+  try {
+    const firsts = await Promise.all(Array.from({ length: total - 1 }, (_, i) => send(i)));
+    const bad = firsts.find((r) => !r.ok);
+    if (bad) return bad;
+    return await send(total - 1);
+  } catch (err) {
+    console.error("上傳酒譜圖片失敗", err);
+    return { ok: false, reason: "network" };
+  }
+}
+
 async function deleteRemoteRecipe(id, password) {
   if (!isWebhookConfigured()) return { ok: false, reason: "not_configured" };
   try {

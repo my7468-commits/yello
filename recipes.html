@@ -110,8 +110,11 @@
         <textarea id="fGarnish" rows="2"></textarea>
       </div>
       <div class="field">
-        <label for="fImage">成品圖片（填圖片檔名，或完整圖片網址）</label>
-        <input type="text" id="fImage" placeholder="例如：manhattan.jpg" />
+        <label for="fImageFile">成品圖片</label>
+        <img id="fImagePreview" alt="" style="display:none;max-width:260px;width:100%;border-radius:8px;margin-bottom:8px;" />
+        <input type="file" id="fImageFile" accept="image/*" />
+        <button type="button" class="secondary" id="fImageRemove" style="display:none;margin-top:8px;">移除圖片</button>
+        <div id="fImageHint" style="color:var(--text-muted);font-size:0.85rem;margin-top:6px;">選擇照片後會自動縮小，按「儲存酒譜」時一併上傳。</div>
       </div>
       <div class="field">
         <label for="fNotes">備註</label>
@@ -440,6 +443,81 @@ function parseIngredients(text) {
   });
 }
 
+/* ---------- 圖片上傳（縮小後存進試算表） ---------- */
+// current：酒譜目前已有的圖片（data URL、網址或檔名）；pending：這次剛選的新圖（已壓縮的 data URL）
+let imgState = { current: "", pending: null, removed: false };
+const IMG_MAX_CHARS = 44000; // 試算表單一儲存格上限約 5 萬字元，留一點餘裕
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => resolve(img);
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// 逐步縮小尺寸與品質，直到壓縮後的 data URL 小於上限
+async function compressImage(file) {
+  const img = await loadImage(file);
+  const sizes = [640, 520, 420, 340, 280];
+  for (const maxSide of sizes) {
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (let q = 0.72; q >= 0.4; q -= 0.08) {
+      const url = canvas.toDataURL("image/jpeg", q);
+      if (url.length <= IMG_MAX_CHARS) return url;
+    }
+  }
+  throw new Error("too_large");
+}
+
+function refreshImagePreview() {
+  const preview = document.getElementById("fImagePreview");
+  const removeBtn = document.getElementById("fImageRemove");
+  const src = imgState.pending || (imgState.removed ? "" : imgState.current);
+  if (src) {
+    preview.src = src;
+    preview.style.display = "block";
+    removeBtn.style.display = "inline-block";
+  } else {
+    preview.removeAttribute("src");
+    preview.style.display = "none";
+    removeBtn.style.display = "none";
+  }
+}
+
+document.getElementById("fImageFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const hint = document.getElementById("fImageHint");
+  hint.textContent = "圖片處理中...";
+  try {
+    imgState.pending = await compressImage(file);
+    imgState.removed = false;
+    hint.textContent = "已選擇照片（已自動縮小），按「儲存酒譜」後上傳。";
+  } catch (err) {
+    imgState.pending = null;
+    hint.textContent = "這張圖片無法處理，請換一張試試。";
+  }
+  refreshImagePreview();
+});
+
+document.getElementById("fImageRemove").addEventListener("click", () => {
+  imgState.pending = null;
+  imgState.removed = true;
+  document.getElementById("fImageFile").value = "";
+  refreshImagePreview();
+});
+
 function openEdit(id) {
   const r = id ? recipes.find((x) => x.id === id) : null;
   document.getElementById("editTitle").textContent = r ? "編輯酒譜" : "新增酒譜";
@@ -452,7 +530,9 @@ function openEdit(id) {
   document.getElementById("fSteps").value = r ? r.steps : "";
   document.getElementById("fGarnish").value = r ? r.garnish : "";
   document.getElementById("fNotes").value = r ? r.notes : "";
-  document.getElementById("fImage").value = r ? r.image || "" : "";
+  imgState = { current: r ? r.image || "" : "", pending: null, removed: false };
+  document.getElementById("fImageFile").value = "";
+  refreshImagePreview();
   listPanel.style.display = "none";
   detailPanel.style.display = "none";
   editPanel.style.display = "block";
@@ -501,21 +581,49 @@ document.getElementById("recipeForm").addEventListener("submit", async (e) => {
     steps: document.getElementById("fSteps").value.trim(),
     garnish: document.getElementById("fGarnish").value.trim(),
     notes: document.getElementById("fNotes").value.trim(),
-    image: document.getElementById("fImage").value.trim(),
   };
+
+  // 圖片欄位的處理：
+  // - 剛選了新照片：這次先不帶 image（保留原圖），儲存成功後再另外分段上傳
+  // - 按了「移除圖片」：image 設為空字串
+  // - 原本就是上傳的大圖（data URL）：不帶 image，後端會保留原圖（避免網址過長）
+  // - 其它（網址或檔名）：照原樣帶回
+  const hasUpload = !!imgState.pending;
+  if (!hasUpload) {
+    if (imgState.removed) item.image = "";
+    else if (!imgState.current.startsWith("data:")) item.image = imgState.current;
+  }
+
   saveBtn.disabled = true;
   saveBtn.textContent = "儲存中...";
   const result = await saveRemoteRecipe(item, password);
-  saveBtn.disabled = false;
-  saveBtn.textContent = "儲存酒譜";
   if (!result.ok) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "儲存酒譜";
     showToast(result.reason === "密碼錯誤" ? "密碼錯誤" : "儲存失敗：" + (result.reason || "請稍後再試"));
     return;
   }
-  if (existingId) recipes = recipes.map((r) => (r.id === existingId ? item : r));
-  else recipes = [...recipes, item];
+
+  // 本機清單裡這道酒譜的圖片：沒動就維持原樣
+  let finalImage = imgState.removed ? "" : imgState.current;
+  let toastMsg = "已儲存";
+  if (hasUpload) {
+    saveBtn.textContent = "圖片上傳中...";
+    const up = await uploadRecipeImage(item.id, imgState.pending, password);
+    if (up.ok) {
+      finalImage = imgState.pending;
+    } else {
+      toastMsg = "酒譜已儲存，但圖片上傳失敗（" + (up.reason || "未知原因") + "）";
+    }
+  }
+  saveBtn.disabled = false;
+  saveBtn.textContent = "儲存酒譜";
+
+  const saved = { ...item, image: finalImage };
+  if (existingId) recipes = recipes.map((r) => (r.id === existingId ? saved : r));
+  else recipes = [...recipes, saved];
   currentId = item.id;
-  showToast("已儲存");
+  showToast(toastMsg);
   closeEdit();
 });
 
